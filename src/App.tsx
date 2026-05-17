@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Calculator, Copy, RotateCcw, Grid3X3, Layers, Home, Paintbrush, Hammer, Sofa, Lightbulb, Plug, Wind } from "lucide-react";
 
 type CategoryKey = "tile" | "wallpaper" | "floor" | "paint" | "wood" | "furniture" | "lighting" | "electric" | "aircon";
@@ -161,7 +161,9 @@ function App() {
   }, [category, inputs]);
 
   const copy = async () => {
-    await navigator.clipboard.writeText(`[${selected.label} 계산 결과]\n` + result.map((r) => `${r[0]}: ${r[1]}`).join("\n"));
+    await navigator.clipboard.writeText(`[${selected.label} 계산 결과]
+` + result.map((r) => `${r[0]}: ${r[1]}`).join("
+"));
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   };
