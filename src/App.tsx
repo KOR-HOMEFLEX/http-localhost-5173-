@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ElementType } from "react";
 import {
   Calculator,
   Copy,
@@ -25,66 +26,197 @@ type CategoryKey =
   | "electric"
   | "aircon";
 
-type Inputs = {
-  widthMm: number;
-  depthMm: number;
-  heightMm: number;
-  qty: number;
-  lossRate: number;
-  tileWidthMm: number;
-  tileHeightMm: number;
-  piecesPerBox: number;
-  siliconeLengthMm: number;
-  siliconeCoveragePerTubeM: number;
-  rollCoverage: number;
-  boxCoverage: number;
-  paintCoveragePerLiter: number;
-  boardArea: number;
-  lightingAreaPerUnit: number;
-  outletAreaPerUnit: number;
+type FieldConfig = {
+  key: string;
+  label: string;
+  suffix: string;
+};
+
+type CategoryConfig = {
+  key: CategoryKey;
+  label: string;
+  icon: ElementType;
+  description: string;
+  fields: FieldConfig[];
 };
 
 type ResultData = {
   mainLabel: string;
   mainValue: string;
+  helper: string;
   items: Array<[string, string]>;
 };
 
-const STORAGE_KEY = "interior-material-calc-original-like-v1";
+type AllInputs = Record<CategoryKey, Record<string, number>>;
 
-const categories: Array<{
-  key: CategoryKey;
-  label: string;
-  icon: React.ElementType;
-}> = [
-  { key: "tile", label: "타일", icon: Grid3X3 },
-  { key: "wallpaper", label: "도배", icon: Layers },
-  { key: "floor", label: "마루", icon: Home },
-  { key: "paint", label: "페인트", icon: Paintbrush },
-  { key: "wood", label: "목공", icon: Hammer },
-  { key: "furniture", label: "가구", icon: Sofa },
-  { key: "lighting", label: "조명", icon: Lightbulb },
-  { key: "electric", label: "전기", icon: Plug },
-  { key: "aircon", label: "에어컨", icon: Wind },
+const STORAGE_KEY = "interior-material-calc-by-category-v1";
+
+const categories: CategoryConfig[] = [
+  {
+    key: "tile",
+    label: "타일",
+    icon: Grid3X3,
+    description: "타일 규격, 박스 구성, 줄눈·실리콘까지 계산합니다.",
+    fields: [
+      { key: "areaM2", label: "시공 면적", suffix: "㎡" },
+      { key: "tileWidthMm", label: "타일 1장 가로", suffix: "mm" },
+      { key: "tileHeightMm", label: "타일 1장 세로", suffix: "mm" },
+      { key: "piecesPerBox", label: "박스당 장수", suffix: "장" },
+      { key: "lossRate", label: "로스율", suffix: "%" },
+      { key: "groutLengthM", label: "줄눈/실리콘 길이", suffix: "m" },
+      { key: "siliconeCoverageM", label: "실리콘 1개 시공 길이", suffix: "m" },
+    ],
+  },
+  {
+    key: "wallpaper",
+    label: "도배",
+    icon: Layers,
+    description: "벽 길이, 높이, 제외 면적, 롤당 시공 가능 면적으로 계산합니다.",
+    fields: [
+      { key: "wallLengthM", label: "벽 전체 길이", suffix: "m" },
+      { key: "wallHeightM", label: "벽 높이", suffix: "m" },
+      { key: "deductAreaM2", label: "창/문 제외 면적", suffix: "㎡" },
+      { key: "rollCoverageM2", label: "롤당 시공 가능 면적", suffix: "㎡" },
+      { key: "lossRate", label: "로스율", suffix: "%" },
+    ],
+  },
+  {
+    key: "floor",
+    label: "마루",
+    icon: Home,
+    description: "바닥 면적과 박스당 시공 면적으로 필요 박스를 계산합니다.",
+    fields: [
+      { key: "floorAreaM2", label: "바닥 면적", suffix: "㎡" },
+      { key: "boxCoverageM2", label: "박스당 시공 가능 면적", suffix: "㎡" },
+      { key: "lossRate", label: "로스율", suffix: "%" },
+    ],
+  },
+  {
+    key: "paint",
+    label: "페인트",
+    icon: Paintbrush,
+    description: "도장 면적, 도장 횟수, 1L당 도포 면적으로 계산합니다.",
+    fields: [
+      { key: "paintAreaM2", label: "도장 면적", suffix: "㎡" },
+      { key: "coats", label: "도장 횟수", suffix: "회" },
+      { key: "coveragePerLiterM2", label: "1L당 도포 면적", suffix: "㎡" },
+      { key: "lossRate", label: "로스율", suffix: "%" },
+    ],
+  },
+  {
+    key: "wood",
+    label: "목공",
+    icon: Hammer,
+    description: "보드 면적, 장당 면적, 레이어 수 기준으로 목공 장수를 계산합니다.",
+    fields: [
+      { key: "workAreaM2", label: "작업 면적", suffix: "㎡" },
+      { key: "boardAreaM2", label: "보드 1장 면적", suffix: "㎡" },
+      { key: "layers", label: "시공 레이어", suffix: "겹" },
+      { key: "lossRate", label: "로스율", suffix: "%" },
+    ],
+  },
+  {
+    key: "furniture",
+    label: "가구",
+    icon: Sofa,
+    description: "가구 수량과 예비율 기준으로 발주 수량을 계산합니다.",
+    fields: [
+      { key: "baseQty", label: "기본 수량", suffix: "개" },
+      { key: "spareRate", label: "예비율", suffix: "%" },
+      { key: "setCount", label: "세트 수", suffix: "세트" },
+    ],
+  },
+  {
+    key: "lighting",
+    label: "조명",
+    icon: Lightbulb,
+    description: "공간 면적과 조명 기준 면적으로 권장 조명 수를 계산합니다.",
+    fields: [
+      { key: "roomAreaM2", label: "공간 면적", suffix: "㎡" },
+      { key: "areaPerLightM2", label: "조명 1개당 기준 면적", suffix: "㎡" },
+      { key: "extraLights", label: "추가 조명", suffix: "개" },
+    ],
+  },
+  {
+    key: "electric",
+    label: "전기",
+    icon: Plug,
+    description: "면적, 콘센트 기준, 스위치, 회로 수를 함께 계산합니다.",
+    fields: [
+      { key: "roomAreaM2", label: "공간 면적", suffix: "㎡" },
+      { key: "areaPerOutletM2", label: "콘센트 1개당 기준 면적", suffix: "㎡" },
+      { key: "switchQty", label: "스위치 수", suffix: "개" },
+      { key: "circuitQty", label: "회로 수", suffix: "회로" },
+    ],
+  },
+  {
+    key: "aircon",
+    label: "에어컨",
+    icon: Wind,
+    description: "공간 면적, 층고, 보정률 기준으로 냉방 평형을 계산합니다.",
+    fields: [
+      { key: "roomAreaM2", label: "공간 면적", suffix: "㎡" },
+      { key: "heightM", label: "층고", suffix: "m" },
+      { key: "correctionRate", label: "상향 보정률", suffix: "%" },
+    ],
+  },
 ];
 
-const defaultInputs: Inputs = {
-  widthMm: 3000,
-  depthMm: 4000,
-  heightMm: 2400,
-  qty: 1,
-  lossRate: 10,
-  tileWidthMm: 600,
-  tileHeightMm: 600,
-  piecesPerBox: 4,
-  siliconeLengthMm: 12000,
-  siliconeCoveragePerTubeM: 8,
-  rollCoverage: 5,
-  boxCoverage: 3.3,
-  paintCoveragePerLiter: 8,
-  boardArea: 1.62,
-  lightingAreaPerUnit: 5,
-  outletAreaPerUnit: 6,
+const defaultInputs: AllInputs = {
+  tile: {
+    areaM2: 12,
+    tileWidthMm: 600,
+    tileHeightMm: 600,
+    piecesPerBox: 4,
+    lossRate: 10,
+    groutLengthM: 15,
+    siliconeCoverageM: 8,
+  },
+  wallpaper: {
+    wallLengthM: 12,
+    wallHeightM: 2.4,
+    deductAreaM2: 2,
+    rollCoverageM2: 5,
+    lossRate: 10,
+  },
+  floor: {
+    floorAreaM2: 18,
+    boxCoverageM2: 3.3,
+    lossRate: 7,
+  },
+  paint: {
+    paintAreaM2: 30,
+    coats: 2,
+    coveragePerLiterM2: 8,
+    lossRate: 10,
+  },
+  wood: {
+    workAreaM2: 12,
+    boardAreaM2: 1.62,
+    layers: 1,
+    lossRate: 10,
+  },
+  furniture: {
+    baseQty: 5,
+    spareRate: 5,
+    setCount: 1,
+  },
+  lighting: {
+    roomAreaM2: 20,
+    areaPerLightM2: 5,
+    extraLights: 0,
+  },
+  electric: {
+    roomAreaM2: 20,
+    areaPerOutletM2: 6,
+    switchQty: 2,
+    circuitQty: 1,
+  },
+  aircon: {
+    roomAreaM2: 20,
+    heightM: 2.4,
+    correctionRate: 10,
+  },
 };
 
 function safe(value: number) {
@@ -106,7 +238,7 @@ function ceil(value: number) {
   return Math.ceil(safe(value)).toLocaleString("ko-KR");
 }
 
-function InputBox({
+function NumberInput({
   label,
   value,
   suffix,
@@ -123,7 +255,7 @@ function InputBox({
       <div className="field-control">
         <input
           type="number"
-          value={value}
+          value={Number.isFinite(value) ? value : 0}
           onChange={(event) => onChange(Number(event.target.value))}
         />
         <em>{suffix}</em>
@@ -134,7 +266,7 @@ function InputBox({
 
 export default function App() {
   const [category, setCategory] = useState<CategoryKey>("tile");
-  const [inputs, setInputs] = useState<Inputs>(defaultInputs);
+  const [inputs, setInputs] = useState<AllInputs>(defaultInputs);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -142,8 +274,18 @@ export default function App() {
     if (!saved) return;
 
     try {
-      const parsed = JSON.parse(saved) as Partial<Inputs>;
-      setInputs({ ...defaultInputs, ...parsed });
+      const parsed = JSON.parse(saved) as Partial<AllInputs>;
+      setInputs({
+        tile: { ...defaultInputs.tile, ...parsed.tile },
+        wallpaper: { ...defaultInputs.wallpaper, ...parsed.wallpaper },
+        floor: { ...defaultInputs.floor, ...parsed.floor },
+        paint: { ...defaultInputs.paint, ...parsed.paint },
+        wood: { ...defaultInputs.wood, ...parsed.wood },
+        furniture: { ...defaultInputs.furniture, ...parsed.furniture },
+        lighting: { ...defaultInputs.lighting, ...parsed.lighting },
+        electric: { ...defaultInputs.electric, ...parsed.electric },
+        aircon: { ...defaultInputs.aircon, ...parsed.aircon },
+      });
     } catch {
       setInputs(defaultInputs);
     }
@@ -154,75 +296,85 @@ export default function App() {
   }, [inputs]);
 
   const selected = categories.find((item) => item.key === category) ?? categories[0];
+  const currentInputs = inputs[category];
 
-  const update = (key: keyof Inputs, value: number) => {
-    setInputs((prev) => ({ ...prev, [key]: safe(value) }));
+  const update = (key: string, value: number) => {
+    setInputs((prev) => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [key]: safe(value),
+      },
+    }));
+  };
+
+  const resetCurrent = () => {
+    setInputs((prev) => ({
+      ...prev,
+      [category]: { ...defaultInputs[category] },
+    }));
   };
 
   const result: ResultData = useMemo(() => {
-    const widthM = mmToM(inputs.widthMm);
-    const depthM = mmToM(inputs.depthMm);
-    const heightM = mmToM(inputs.heightMm);
-    const qty = Math.max(inputs.qty, 1);
-    const lossRate = safe(inputs.lossRate);
-    const loss = 1 + lossRate / 100;
-
-    const floorArea = widthM * depthM * qty;
-    const wallArea = widthM * heightM * qty;
-    const orderArea = floorArea * loss;
+    const value = inputs[category];
 
     if (category === "tile") {
-      const tileArea = mmToM(inputs.tileWidthMm) * mmToM(inputs.tileHeightMm);
-      const purePieces = tileArea > 0 ? floorArea / tileArea : 0;
-      const orderPieces = tileArea > 0 ? orderArea / tileArea : 0;
-      const boxes = inputs.piecesPerBox > 0 ? orderPieces / inputs.piecesPerBox : 0;
-      const siliconeLengthM = mmToM(inputs.siliconeLengthMm) * qty;
-      const siliconeOrderLengthM = siliconeLengthM * loss;
-      const siliconeTubes =
-        inputs.siliconeCoveragePerTubeM > 0
-          ? siliconeOrderLengthM / inputs.siliconeCoveragePerTubeM
-          : 0;
+      const area = safe(value.areaM2);
+      const lossRate = safe(value.lossRate);
+      const tileArea = mmToM(value.tileWidthMm) * mmToM(value.tileHeightMm);
+      const purePieces = tileArea > 0 ? area / tileArea : 0;
+      const orderPieces = purePieces * (1 + lossRate / 100);
+      const boxes = safe(value.piecesPerBox) > 0 ? orderPieces / value.piecesPerBox : 0;
+      const siliconeTubes = safe(value.siliconeCoverageM) > 0 ? value.groutLengthM / value.siliconeCoverageM : 0;
 
       return {
         mainLabel: "발주 권장 매수",
-        mainValue: `${ceil(orderPieces)} 장`,
+        mainValue: `${ceil(orderPieces)} 매`,
+        helper: "순수 필요량 + 로스율",
         items: [
-          ["시공 면적", `${format(floorArea)} ㎡`],
-          ["순수 필요량", `${ceil(purePieces)} 장`],
+          ["시공 면적", `${format(area)} ㎡`],
+          ["순수 필요량", `${ceil(purePieces)} 매`],
           ["권장 박스 수", `${ceil(boxes)} 박스`],
           ["로스율", `${lossRate}%`],
-          ["실리콘 길이", `${format(siliconeOrderLengthM)} m`],
+          ["줄눈/실리콘 길이", `${format(value.groutLengthM)} m`],
           ["권장 실리콘", `${ceil(siliconeTubes)} 개`],
         ],
       };
     }
 
     if (category === "wallpaper") {
-      const orderWallArea = wallArea * loss;
-      const rolls = inputs.rollCoverage > 0 ? orderWallArea / inputs.rollCoverage : 0;
-      const pureRolls = inputs.rollCoverage > 0 ? wallArea / inputs.rollCoverage : 0;
+      const wallArea = Math.max(value.wallLengthM * value.wallHeightM - value.deductAreaM2, 0);
+      const lossRate = safe(value.lossRate);
+      const orderArea = wallArea * (1 + lossRate / 100);
+      const pureRolls = safe(value.rollCoverageM2) > 0 ? wallArea / value.rollCoverageM2 : 0;
+      const orderRolls = safe(value.rollCoverageM2) > 0 ? orderArea / value.rollCoverageM2 : 0;
 
       return {
         mainLabel: "발주 권장 롤 수",
-        mainValue: `${ceil(rolls)} 롤`,
+        mainValue: `${ceil(orderRolls)} 롤`,
+        helper: "벽면 면적 - 제외 면적 + 로스율",
         items: [
           ["벽면 면적", `${format(wallArea)} ㎡`],
           ["순수 필요량", `${ceil(pureRolls)} 롤`],
-          ["로스 포함 면적", `${format(orderWallArea)} ㎡`],
+          ["로스 포함 면적", `${format(orderArea)} ㎡`],
           ["로스율", `${lossRate}%`],
         ],
       };
     }
 
     if (category === "floor") {
-      const boxes = inputs.boxCoverage > 0 ? orderArea / inputs.boxCoverage : 0;
-      const pureBoxes = inputs.boxCoverage > 0 ? floorArea / inputs.boxCoverage : 0;
+      const area = safe(value.floorAreaM2);
+      const lossRate = safe(value.lossRate);
+      const orderArea = area * (1 + lossRate / 100);
+      const pureBoxes = safe(value.boxCoverageM2) > 0 ? area / value.boxCoverageM2 : 0;
+      const orderBoxes = safe(value.boxCoverageM2) > 0 ? orderArea / value.boxCoverageM2 : 0;
 
       return {
         mainLabel: "발주 권장 박스 수",
-        mainValue: `${ceil(boxes)} 박스`,
+        mainValue: `${ceil(orderBoxes)} 박스`,
+        helper: "바닥 면적 + 로스율",
         items: [
-          ["바닥 면적", `${format(floorArea)} ㎡`],
+          ["바닥 면적", `${format(area)} ㎡`],
           ["순수 필요량", `${ceil(pureBoxes)} 박스`],
           ["로스 포함 면적", `${format(orderArea)} ㎡`],
           ["로스율", `${lossRate}%`],
@@ -231,110 +383,120 @@ export default function App() {
     }
 
     if (category === "paint") {
-      const orderWallArea = wallArea * loss;
-      const liters =
-        inputs.paintCoveragePerLiter > 0
-          ? orderWallArea / inputs.paintCoveragePerLiter
-          : 0;
-      const pureLiters =
-        inputs.paintCoveragePerLiter > 0 ? wallArea / inputs.paintCoveragePerLiter : 0;
+      const baseArea = safe(value.paintAreaM2) * Math.max(safe(value.coats), 1);
+      const lossRate = safe(value.lossRate);
+      const orderArea = baseArea * (1 + lossRate / 100);
+      const pureLiters = safe(value.coveragePerLiterM2) > 0 ? baseArea / value.coveragePerLiterM2 : 0;
+      const orderLiters = safe(value.coveragePerLiterM2) > 0 ? orderArea / value.coveragePerLiterM2 : 0;
 
       return {
         mainLabel: "발주 권장 용량",
-        mainValue: `${ceil(liters)} L`,
+        mainValue: `${ceil(orderLiters)} L`,
+        helper: "도장 면적 × 도장 횟수 + 로스율",
         items: [
-          ["도장 면적", `${format(wallArea)} ㎡`],
+          ["총 도장 면적", `${format(baseArea)} ㎡`],
           ["순수 필요량", `${format(pureLiters)} L`],
-          ["로스 포함 용량", `${format(liters)} L`],
-          ["로스율", `${lossRate}%`],
+          ["로스 포함 용량", `${format(orderLiters)} L`],
+          ["도장 횟수", `${format(value.coats, 0)} 회`],
         ],
       };
     }
 
     if (category === "wood") {
-      const boards = inputs.boardArea > 0 ? orderArea / inputs.boardArea : 0;
-      const pureBoards = inputs.boardArea > 0 ? floorArea / inputs.boardArea : 0;
+      const baseArea = safe(value.workAreaM2) * Math.max(safe(value.layers), 1);
+      const lossRate = safe(value.lossRate);
+      const orderArea = baseArea * (1 + lossRate / 100);
+      const pureBoards = safe(value.boardAreaM2) > 0 ? baseArea / value.boardAreaM2 : 0;
+      const orderBoards = safe(value.boardAreaM2) > 0 ? orderArea / value.boardAreaM2 : 0;
 
       return {
         mainLabel: "발주 권장 장수",
-        mainValue: `${ceil(boards)} 장`,
+        mainValue: `${ceil(orderBoards)} 장`,
+        helper: "작업 면적 × 레이어 + 로스율",
         items: [
-          ["작업 면적", `${format(floorArea)} ㎡`],
+          ["작업 면적", `${format(baseArea)} ㎡`],
           ["순수 필요량", `${ceil(pureBoards)} 장`],
-          ["보드 1장 면적", `${format(inputs.boardArea)} ㎡`],
+          ["보드 1장 면적", `${format(value.boardAreaM2)} ㎡`],
           ["로스율", `${lossRate}%`],
         ],
       };
     }
 
     if (category === "furniture") {
-      const orderQty = qty * loss;
+      const baseQty = safe(value.baseQty) * Math.max(safe(value.setCount), 1);
+      const orderQty = baseQty * (1 + safe(value.spareRate) / 100);
 
       return {
         mainLabel: "발주 권장 수량",
         mainValue: `${ceil(orderQty)} 개`,
+        helper: "기본 수량 × 세트 수 + 예비율",
         items: [
-          ["기본 수량", `${qty.toLocaleString("ko-KR")} 개`],
+          ["기본 수량", `${format(baseQty, 0)} 개`],
+          ["세트 수", `${format(value.setCount, 0)} 세트`],
+          ["예비율", `${safe(value.spareRate)}%`],
           ["예비 포함 수량", `${format(orderQty)} 개`],
-          ["로스율", `${lossRate}%`],
-          ["계산 기준", "개수 기준"],
         ],
       };
     }
 
     if (category === "lighting") {
-      const units = inputs.lightingAreaPerUnit > 0 ? floorArea / inputs.lightingAreaPerUnit : 0;
+      const baseUnits = safe(value.areaPerLightM2) > 0 ? value.roomAreaM2 / value.areaPerLightM2 : 0;
+      const orderUnits = baseUnits + safe(value.extraLights);
 
       return {
         mainLabel: "권장 조명 수",
-        mainValue: `${ceil(units)} 개`,
+        mainValue: `${ceil(orderUnits)} 개`,
+        helper: "공간 면적 ÷ 조명 기준 면적 + 추가 조명",
         items: [
-          ["공간 면적", `${format(floorArea)} ㎡`],
-          ["기준 면적", `${format(inputs.lightingAreaPerUnit)} ㎡당 1개`],
-          ["수량", `${qty.toLocaleString("ko-KR")} 개소`],
-          ["참고", "용도와 조도에 따라 조정"],
+          ["공간 면적", `${format(value.roomAreaM2)} ㎡`],
+          ["기준 면적", `${format(value.areaPerLightM2)} ㎡당 1개`],
+          ["기본 조명 수", `${ceil(baseUnits)} 개`],
+          ["추가 조명", `${format(value.extraLights, 0)} 개`],
         ],
       };
     }
 
     if (category === "electric") {
-      const units = inputs.outletAreaPerUnit > 0 ? floorArea / inputs.outletAreaPerUnit : 0;
+      const outletQty = safe(value.areaPerOutletM2) > 0 ? value.roomAreaM2 / value.areaPerOutletM2 : 0;
 
       return {
         mainLabel: "권장 콘센트 수",
-        mainValue: `${ceil(units)} 개`,
+        mainValue: `${ceil(outletQty)} 개`,
+        helper: "공간 면적 ÷ 콘센트 기준 면적",
         items: [
-          ["공간 면적", `${format(floorArea)} ㎡`],
-          ["기준 면적", `${format(inputs.outletAreaPerUnit)} ㎡당 1개`],
-          ["수량", `${qty.toLocaleString("ko-KR")} 개소`],
-          ["참고", "가전 배치에 따라 추가"],
+          ["공간 면적", `${format(value.roomAreaM2)} ㎡`],
+          ["기준 면적", `${format(value.areaPerOutletM2)} ㎡당 1개`],
+          ["스위치 수", `${format(value.switchQty, 0)} 개`],
+          ["회로 수", `${format(value.circuitQty, 0)} 회로`],
         ],
       };
     }
 
-    const pyeong = floorArea / 3.305785;
+    const pyeong = safe(value.roomAreaM2) / 3.305785;
+    const heightCorrection = safe(value.heightM) > 2.4 ? value.heightM / 2.4 : 1;
+    const correctedPyeong = pyeong * heightCorrection * (1 + safe(value.correctionRate) / 100);
 
     return {
       mainLabel: "권장 냉방 평형",
-      mainValue: `${ceil(pyeong)} 평형`,
+      mainValue: `${ceil(correctedPyeong)} 평형`,
+      helper: "면적 평수 × 층고 보정 × 상향 보정률",
       items: [
-        ["공간 면적", `${format(floorArea)} ㎡`],
+        ["공간 면적", `${format(value.roomAreaM2)} ㎡`],
         ["평수 환산", `${format(pyeong)} 평`],
-        ["계산식", "㎡ ÷ 3.305785"],
-        ["참고", "층고·창면적에 따라 조정"],
+        ["층고", `${format(value.heightM)} m`],
+        ["상향 보정률", `${safe(value.correctionRate)}%`],
       ],
     };
   }, [category, inputs]);
 
   const copyResult = async () => {
-    const text =
-      `[${selected.label} 계산 결과]
-` +
-      `${result.mainLabel}: ${result.mainValue}
-` +
-      result.items.map((item) => `${item[0]}: ${item[1]}`).join("\\n");
+    const lines = [
+      `[${selected.label} 계산 결과]`,
+      `${result.mainLabel}: ${result.mainValue}`,
+      ...result.items.map((item) => `${item[0]}: ${item[1]}`),
+    ];
 
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(lines.join(String.fromCharCode(10)));
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   };
@@ -373,6 +535,7 @@ export default function App() {
         .main-result { border-radius: 24px; padding: 27px 26px; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; margin-bottom: 15px; box-shadow: 0 18px 32px rgba(37,99,235,.22); }
         .main-label { color: rgba(255,255,255,.78); font-size: 15px; font-weight: 850; }
         .main-value { margin-top: 8px; font-size: clamp(39px, 5.5vw, 54px); line-height: 1; font-weight: 950; letter-spacing: -2px; }
+        .helper { margin-top: 10px; font-size: 14px; color: rgba(255,255,255,.76); font-weight: 800; }
         .result-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
         .result-item { border: 1px solid #e5e7eb; background: #f8fafc; border-radius: 18px; padding: 17px; min-height: 86px; }
         .result-name { color: #64748b; font-size: 14px; font-weight: 850; }
@@ -389,7 +552,7 @@ export default function App() {
               <Calculator size={17} /> 실무용 물량 계산기
             </div>
             <h1>현장 물량 계산 보드</h1>
-            <p className="sub">아직 부족한게 많고 최종버전이 아닙니다. 11기 최정훈</p>
+            <p className="sub">자재부터 설비 권장값까지 한 화면에서 계산합니다.</p>
           </section>
 
           <section className="tabs">
@@ -413,36 +576,23 @@ export default function App() {
               <div className="card-top">
                 <div>
                   <h2>입력 정보</h2>
-                  <p className="desc">{selected.label} 계산에 필요한 값을 입력하세요.</p>
+                  <p className="desc">{selected.description}</p>
                 </div>
-                <button className="btn gray" onClick={() => setInputs(defaultInputs)}>
+                <button className="btn gray" onClick={resetCurrent}>
                   <RotateCcw size={17} /> 초기화
                 </button>
               </div>
 
               <div className="form">
-                <InputBox label="가로 / 길이" value={inputs.widthMm} suffix="mm" onChange={(value) => update("widthMm", value)} />
-                <InputBox label="세로 / 깊이" value={inputs.depthMm} suffix="mm" onChange={(value) => update("depthMm", value)} />
-                <InputBox label="높이" value={inputs.heightMm} suffix="mm" onChange={(value) => update("heightMm", value)} />
-                <InputBox label="수량" value={inputs.qty} suffix="개소" onChange={(value) => update("qty", value)} />
-                <InputBox label="로스율" value={inputs.lossRate} suffix="%" onChange={(value) => update("lossRate", value)} />
-
-                {category === "tile" && (
-                  <>
-                    <InputBox label="타일 1장 가로" value={inputs.tileWidthMm} suffix="mm" onChange={(value) => update("tileWidthMm", value)} />
-                    <InputBox label="타일 1장 세로" value={inputs.tileHeightMm} suffix="mm" onChange={(value) => update("tileHeightMm", value)} />
-                    <InputBox label="박스당 장수" value={inputs.piecesPerBox} suffix="장" onChange={(value) => update("piecesPerBox", value)} />
-                    <InputBox label="실리콘 시공 길이" value={inputs.siliconeLengthMm} suffix="mm" onChange={(value) => update("siliconeLengthMm", value)} />
-                    <InputBox label="실리콘 1개당 시공 길이" value={inputs.siliconeCoveragePerTubeM} suffix="m" onChange={(value) => update("siliconeCoveragePerTubeM", value)} />
-                  </>
-                )}
-
-                {category === "wallpaper" && <InputBox label="롤당 시공 가능 면적" value={inputs.rollCoverage} suffix="㎡" onChange={(value) => update("rollCoverage", value)} />}
-                {category === "floor" && <InputBox label="박스당 시공 가능 면적" value={inputs.boxCoverage} suffix="㎡" onChange={(value) => update("boxCoverage", value)} />}
-                {category === "paint" && <InputBox label="1L당 도포 가능 면적" value={inputs.paintCoveragePerLiter} suffix="㎡" onChange={(value) => update("paintCoveragePerLiter", value)} />}
-                {category === "wood" && <InputBox label="보드 1장 면적" value={inputs.boardArea} suffix="㎡" onChange={(value) => update("boardArea", value)} />}
-                {category === "lighting" && <InputBox label="조명 1개당 기준 면적" value={inputs.lightingAreaPerUnit} suffix="㎡" onChange={(value) => update("lightingAreaPerUnit", value)} />}
-                {category === "electric" && <InputBox label="콘센트 1개당 기준 면적" value={inputs.outletAreaPerUnit} suffix="㎡" onChange={(value) => update("outletAreaPerUnit", value)} />}
+                {selected.fields.map((field) => (
+                  <NumberInput
+                    key={field.key}
+                    label={field.label}
+                    value={currentInputs[field.key] ?? 0}
+                    suffix={field.suffix}
+                    onChange={(value) => update(field.key, value)}
+                  />
+                ))}
               </div>
             </div>
 
@@ -460,6 +610,7 @@ export default function App() {
               <div className="main-result">
                 <div className="main-label">{result.mainLabel}</div>
                 <div className="main-value">{result.mainValue}</div>
+                <div className="helper">{result.helper}</div>
               </div>
 
               <div className="result-grid">
