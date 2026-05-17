@@ -162,8 +162,7 @@ function App() {
 
   const copy = async () => {
     await navigator.clipboard.writeText(`[${selected.label} 계산 결과]
-` + result.map((r) => `${r[0]}: ${r[1]}`).join("
-"));
+` + result.map((r) => `${r[0]}: ${r[1]}`).join("\\n"));
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   };
