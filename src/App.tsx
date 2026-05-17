@@ -389,7 +389,7 @@ export default function App() {
               <Calculator size={17} /> 실무용 물량 계산기
             </div>
             <h1>현장 물량 계산 보드</h1>
-            <p className="sub">자재부터 설비 권장값까지 한 화면에서 계산합니다.</p>
+            <p className="sub">아직 부족한게 많고 최종버전이 아닙니다. 11기 최정훈</p>
           </section>
 
           <section className="tabs">
