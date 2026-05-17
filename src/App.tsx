@@ -34,6 +34,8 @@ type Inputs = {
   tileWidthMm: number;
   tileHeightMm: number;
   piecesPerBox: number;
+  siliconeLengthMm: number;
+  siliconeCoveragePerTubeM: number;
   rollCoverage: number;
   boxCoverage: number;
   paintCoveragePerLiter: number;
@@ -42,9 +44,19 @@ type Inputs = {
   outletAreaPerUnit: number;
 };
 
-const STORAGE_KEY = "interior-material-calc-clean-v1";
+type ResultData = {
+  mainLabel: string;
+  mainValue: string;
+  items: Array<[string, string]>;
+};
 
-const categories = [
+const STORAGE_KEY = "interior-material-calc-original-like-v1";
+
+const categories: Array<{
+  key: CategoryKey;
+  label: string;
+  icon: React.ElementType;
+}> = [
   { key: "tile", label: "타일", icon: Grid3X3 },
   { key: "wallpaper", label: "도배", icon: Layers },
   { key: "floor", label: "마루", icon: Home },
@@ -54,7 +66,7 @@ const categories = [
   { key: "lighting", label: "조명", icon: Lightbulb },
   { key: "electric", label: "전기", icon: Plug },
   { key: "aircon", label: "에어컨", icon: Wind },
-] as const;
+];
 
 const defaultInputs: Inputs = {
   widthMm: 3000,
@@ -65,6 +77,8 @@ const defaultInputs: Inputs = {
   tileWidthMm: 600,
   tileHeightMm: 600,
   piecesPerBox: 4,
+  siliconeLengthMm: 12000,
+  siliconeCoveragePerTubeM: 8,
   rollCoverage: 5,
   boxCoverage: 3.3,
   paintCoveragePerLiter: 8,
@@ -104,9 +118,9 @@ function InputBox({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="input-wrap">
-      <span>{label}</span>
-      <div className="input-box">
+    <label className="field">
+      <span className="field-label">{label}</span>
+      <div className="field-control">
         <input
           type="number"
           value={value}
@@ -128,7 +142,8 @@ export default function App() {
     if (!saved) return;
 
     try {
-      setInputs({ ...defaultInputs, ...JSON.parse(saved) });
+      const parsed = JSON.parse(saved) as Partial<Inputs>;
+      setInputs({ ...defaultInputs, ...parsed });
     } catch {
       setInputs(defaultInputs);
     }
@@ -144,7 +159,7 @@ export default function App() {
     setInputs((prev) => ({ ...prev, [key]: safe(value) }));
   };
 
-  const result = useMemo(() => {
+  const result: ResultData = useMemo(() => {
     const widthM = mmToM(inputs.widthMm);
     const depthM = mmToM(inputs.depthMm);
     const heightM = mmToM(inputs.heightMm);
@@ -161,6 +176,12 @@ export default function App() {
       const purePieces = tileArea > 0 ? floorArea / tileArea : 0;
       const orderPieces = tileArea > 0 ? orderArea / tileArea : 0;
       const boxes = inputs.piecesPerBox > 0 ? orderPieces / inputs.piecesPerBox : 0;
+      const siliconeLengthM = mmToM(inputs.siliconeLengthMm) * qty;
+      const siliconeOrderLengthM = siliconeLengthM * loss;
+      const siliconeTubes =
+        inputs.siliconeCoveragePerTubeM > 0
+          ? siliconeOrderLengthM / inputs.siliconeCoveragePerTubeM
+          : 0;
 
       return {
         mainLabel: "발주 권장 매수",
@@ -168,8 +189,10 @@ export default function App() {
         items: [
           ["시공 면적", `${format(floorArea)} ㎡`],
           ["순수 필요량", `${ceil(purePieces)} 장`],
-          ["로스율", `${lossRate}%`],
           ["권장 박스 수", `${ceil(boxes)} 박스`],
+          ["로스율", `${lossRate}%`],
+          ["실리콘 길이", `${format(siliconeOrderLengthM)} m`],
+          ["권장 실리콘", `${ceil(siliconeTubes)} 개`],
         ],
       };
     }
@@ -209,8 +232,12 @@ export default function App() {
 
     if (category === "paint") {
       const orderWallArea = wallArea * loss;
-      const liters = inputs.paintCoveragePerLiter > 0 ? orderWallArea / inputs.paintCoveragePerLiter : 0;
-      const pureLiters = inputs.paintCoveragePerLiter > 0 ? wallArea / inputs.paintCoveragePerLiter : 0;
+      const liters =
+        inputs.paintCoveragePerLiter > 0
+          ? orderWallArea / inputs.paintCoveragePerLiter
+          : 0;
+      const pureLiters =
+        inputs.paintCoveragePerLiter > 0 ? wallArea / inputs.paintCoveragePerLiter : 0;
 
       return {
         mainLabel: "발주 권장 용량",
@@ -305,8 +332,7 @@ export default function App() {
 ` +
       `${result.mainLabel}: ${result.mainValue}
 ` +
-      result.items.map((item) => `${item[0]}: ${item[1]}`).join("
-");
+      result.items.map((item) => `${item[0]}: ${item[1]}`).join("\\n");
 
     await navigator.clipboard.writeText(text);
     setCopied(true);
@@ -317,42 +343,43 @@ export default function App() {
     <>
       <style>{`
         * { box-sizing: border-box; }
-        html { background: #f5f7fb; }
-        body { margin: 0; color: #162033; font-family: Arial, sans-serif; }
-        .page { min-height: 100vh; padding: 34px 18px; background: linear-gradient(180deg, #f7f9fd 0%, #eef3fb 100%); }
-        .wrap { max-width: 1160px; margin: 0 auto; }
-        .hero { padding: 28px 8px 22px; text-align: center; }
-        .hero-badge { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; background: #eaf2ff; color: #2563eb; font-weight: 800; font-size: 14px; margin-bottom: 14px; }
-        h1 { margin: 0; font-size: clamp(34px, 6vw, 58px); letter-spacing: -2px; color: #111827; line-height: 1.08; }
-        .sub { margin: 14px 0 0; color: #64748b; font-size: 18px; line-height: 1.6; }
-        .tabs { display: grid; grid-template-columns: repeat(9, 1fr); gap: 10px; margin: 24px 0; }
-        .tab { border: 1px solid #e2e8f0; background: white; color: #334155; border-radius: 18px; padding: 15px 8px; font-weight: 800; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 7px; box-shadow: 0 8px 20px rgba(15,23,42,.05); transition: .15s ease; }
-        .tab:hover { transform: translateY(-1px); border-color: #bfdbfe; }
-        .tab.active { background: #2563eb; color: white; border-color: #2563eb; box-shadow: 0 14px 30px rgba(37,99,235,.22); }
-        .layout { display: grid; grid-template-columns: 1.05fr .95fr; gap: 22px; }
-        .card { background: white; border: 1px solid #e5e7eb; border-radius: 26px; padding: 26px; box-shadow: 0 18px 45px rgba(15,23,42,.08); }
-        .card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
-        h2 { margin: 0; font-size: 24px; color: #111827; }
-        .desc { margin: 6px 0 0; color: #64748b; }
-        .form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-        .input-wrap span { display: block; color: #475569; font-size: 14px; font-weight: 800; margin-bottom: 8px; }
-        .input-box { height: 54px; display: flex; align-items: center; border: 1px solid #dbe3ef; background: #f8fafc; border-radius: 16px; padding: 0 14px; }
-        .input-box:focus-within { border-color: #2563eb; background: white; box-shadow: 0 0 0 4px rgba(37,99,235,.08); }
-        .input-box input { width: 100%; border: none; outline: none; background: transparent; color: #111827; font-size: 18px; font-weight: 900; }
-        .input-box em { color: #64748b; font-style: normal; font-weight: 800; white-space: nowrap; }
-        .btn { border: none; border-radius: 15px; padding: 13px 16px; font-weight: 900; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+        html { background: #f4f6fb; }
+        body { margin: 0; color: #172033; font-family: Arial, sans-serif; }
+        input, button { font-family: inherit; }
+        .page { min-height: 100vh; padding: 38px 18px 52px; background: linear-gradient(180deg, #f8fafc 0%, #eef3fb 100%); }
+        .wrap { max-width: 1120px; margin: 0 auto; }
+        .hero { text-align: center; padding: 20px 0 22px; }
+        .hero-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: #eaf2ff; color: #2563eb; font-size: 14px; font-weight: 800; margin-bottom: 15px; }
+        h1 { margin: 0; color: #0f172a; font-size: clamp(34px, 5.5vw, 56px); line-height: 1.08; letter-spacing: -2.4px; font-weight: 900; }
+        .sub { margin: 13px 0 0; color: #64748b; font-size: 18px; line-height: 1.6; }
+        .tabs { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 10px; margin: 24px 0 22px; }
+        .tab { min-height: 74px; border: 1px solid #e2e8f0; background: rgba(255,255,255,.96); color: #334155; border-radius: 18px; padding: 12px 8px; font-weight: 850; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; box-shadow: 0 8px 22px rgba(15,23,42,.055); transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease; }
+        .tab:hover { transform: translateY(-1px); border-color: #bfdbfe; box-shadow: 0 12px 26px rgba(15,23,42,.075); }
+        .tab.active { background: #2563eb; color: white; border-color: #2563eb; box-shadow: 0 16px 34px rgba(37,99,235,.25); }
+        .layout { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(360px, .92fr); gap: 22px; align-items: start; }
+        .card { background: rgba(255,255,255,.98); border: 1px solid #e5e7eb; border-radius: 26px; padding: 25px; box-shadow: 0 18px 45px rgba(15,23,42,.085); }
+        .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 22px; }
+        h2 { margin: 0; color: #0f172a; font-size: 24px; line-height: 1.25; letter-spacing: -.5px; font-weight: 900; }
+        .desc { margin: 6px 0 0; color: #64748b; font-size: 14px; line-height: 1.5; }
+        .form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+        .field-label { display: block; color: #475569; font-size: 14px; font-weight: 850; margin-bottom: 8px; }
+        .field-control { height: 54px; display: flex; align-items: center; border: 1px solid #dbe3ef; background: #f8fafc; border-radius: 16px; padding: 0 14px; transition: border-color .14s ease, box-shadow .14s ease, background .14s ease; }
+        .field-control:focus-within { border-color: #2563eb; background: #fff; box-shadow: 0 0 0 4px rgba(37,99,235,.09); }
+        .field-control input { width: 100%; min-width: 0; border: none; outline: none; background: transparent; color: #0f172a; font-size: 18px; font-weight: 900; }
+        .field-control em { color: #64748b; font-style: normal; font-size: 14px; font-weight: 850; white-space: nowrap; }
+        .btn { height: 46px; border: none; border-radius: 15px; padding: 0 15px; font-weight: 900; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
         .btn.gray { background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
-        .btn.blue { background: #2563eb; color: white; }
-        .main-result { border-radius: 24px; padding: 28px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; margin-bottom: 16px; }
-        .main-label { font-size: 15px; font-weight: 800; color: rgba(255,255,255,.78); }
-        .main-value { margin-top: 8px; font-size: clamp(38px, 6vw, 56px); font-weight: 1000; letter-spacing: -2px; }
-        .result-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .result-item { border: 1px solid #e5e7eb; background: #f8fafc; border-radius: 18px; padding: 18px; }
-        .result-name { color: #64748b; font-size: 14px; font-weight: 800; }
-        .result-value { margin-top: 8px; color: #111827; font-size: 22px; font-weight: 1000; }
-        .notice { margin-top: 20px; padding: 16px 18px; border-radius: 18px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 14px; line-height: 1.6; }
-        @media (max-width: 960px) { .tabs { grid-template-columns: repeat(3, 1fr); } .layout { grid-template-columns: 1fr; } }
-        @media (max-width: 560px) { .page { padding: 22px 12px; } .tabs { grid-template-columns: repeat(2, 1fr); } .card { padding: 20px; border-radius: 22px; } .form, .result-grid { grid-template-columns: 1fr; } .card-top { align-items: flex-start; flex-direction: column; } }
+        .btn.blue { background: #2563eb; color: white; box-shadow: 0 12px 24px rgba(37,99,235,.2); }
+        .main-result { border-radius: 24px; padding: 27px 26px; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; margin-bottom: 15px; box-shadow: 0 18px 32px rgba(37,99,235,.22); }
+        .main-label { color: rgba(255,255,255,.78); font-size: 15px; font-weight: 850; }
+        .main-value { margin-top: 8px; font-size: clamp(39px, 5.5vw, 54px); line-height: 1; font-weight: 950; letter-spacing: -2px; }
+        .result-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .result-item { border: 1px solid #e5e7eb; background: #f8fafc; border-radius: 18px; padding: 17px; min-height: 86px; }
+        .result-name { color: #64748b; font-size: 14px; font-weight: 850; }
+        .result-value { margin-top: 8px; color: #0f172a; font-size: 21px; line-height: 1.2; font-weight: 950; letter-spacing: -.4px; }
+        .notice { margin-top: 18px; padding: 15px 17px; border-radius: 18px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 14px; line-height: 1.65; }
+        @media (max-width: 980px) { .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); } .layout { grid-template-columns: 1fr; } }
+        @media (max-width: 580px) { .page { padding: 24px 12px 38px; } .hero { padding-top: 10px; } h1 { letter-spacing: -1.6px; } .sub { font-size: 16px; } .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; } .tab { min-height: 68px; border-radius: 16px; } .card { padding: 20px; border-radius: 22px; } .card-top { flex-direction: column; align-items: stretch; margin-bottom: 18px; } .form { grid-template-columns: 1fr; } .result-grid { grid-template-columns: 1fr; } .btn { width: 100%; } .main-result { padding: 24px; } }
       `}</style>
 
       <main className="page notranslate" translate="no">
@@ -405,6 +432,8 @@ export default function App() {
                     <InputBox label="타일 1장 가로" value={inputs.tileWidthMm} suffix="mm" onChange={(value) => update("tileWidthMm", value)} />
                     <InputBox label="타일 1장 세로" value={inputs.tileHeightMm} suffix="mm" onChange={(value) => update("tileHeightMm", value)} />
                     <InputBox label="박스당 장수" value={inputs.piecesPerBox} suffix="장" onChange={(value) => update("piecesPerBox", value)} />
+                    <InputBox label="실리콘 시공 길이" value={inputs.siliconeLengthMm} suffix="mm" onChange={(value) => update("siliconeLengthMm", value)} />
+                    <InputBox label="실리콘 1개당 시공 길이" value={inputs.siliconeCoveragePerTubeM} suffix="m" onChange={(value) => update("siliconeCoveragePerTubeM", value)} />
                   </>
                 )}
 
