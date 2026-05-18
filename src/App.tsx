@@ -298,7 +298,7 @@ export default function App() {
 
       const calc = floorCalc({
         pyeong: value.pyeong,
-        boxArea: type.area,
+        boxArea: type.coverage,
         lossRate: value.lossRate,
       });
 
@@ -311,7 +311,7 @@ export default function App() {
           { label: "시공 면적", value: `${format(calc.area)} ㎡` },
           { label: "시공 평수", value: `${format(value.pyeong)} 평` },
           { label: "발주 평수", value: `${format(calc.orderPyeong)} 평` },
-          { label: "박스당 면적", value: `${format(type.area)} 평` },
+          { label: "박스당 면적", value: `${format(type.coverage)} 평` },
           { label: "로스율", value: `${format(value.lossRate, 0)}%` },
         ],
       };
@@ -519,7 +519,7 @@ export default function App() {
             <button
               key={item.key}
               className={`tab ${category === item.key ? "active" : ""}`}
-              onClick={() => setCategory(item.key)}
+              onClick={() => setCategory(item.key as CategoryKey)}
             >
               <span>{item.emoji}</span>
               {item.label}
