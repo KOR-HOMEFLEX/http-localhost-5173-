@@ -23,51 +23,15 @@ export type CategoryKey =
 
 export const categories = [
   {
-    key: "tile",
-    label: "타일",
-    emoji: "🧱",
-    icon: Grid3X3,
-  },
-  {
-    key: "wallpaper",
-    label: "도배",
-    emoji: "📜",
-    icon: Layers,
-  },
-  {
-    key: "floor",
-    label: "마루",
-    emoji: "🪵",
-    icon: Home,
-  },
-  {
-    key: "paint",
-    label: "페인트",
-    emoji: "🎨",
-    icon: Paintbrush,
-  },
-  {
     key: "wood",
     label: "목공",
-    emoji: "🔨",
+    emoji: "🪚",
     icon: Hammer,
-  },
-  {
-    key: "furniture",
-    label: "가구",
-    emoji: "🛋️",
-    icon: Sofa,
-  },
-  {
-    key: "lighting",
-    label: "조명",
-    emoji: "💡",
-    icon: Lightbulb,
   },
   {
     key: "electric",
     label: "전기",
-    emoji: "🔌",
+    emoji: "⚡",
     icon: Plug,
   },
   {
@@ -75,6 +39,42 @@ export const categories = [
     label: "에어컨",
     emoji: "❄️",
     icon: Wind,
+  },
+  {
+    key: "paint",
+    label: "페인트",
+    emoji: "🪣",
+    icon: Paintbrush,
+  },
+  {
+    key: "wallpaper",
+    label: "도배",
+    emoji: "🎨",
+    icon: Layers,
+  },
+  {
+    key: "floor",
+    label: "마루",
+    emoji: "📦",
+    icon: Home,
+  },
+  {
+    key: "tile",
+    label: "타일",
+    emoji: "🧱",
+    icon: Grid3X3,
+  },
+  {
+    key: "furniture",
+    label: "가구",
+    emoji: "🧰",
+    icon: Sofa,
+  },
+  {
+    key: "lighting",
+    label: "조명",
+    emoji: "💡",
+    icon: Lightbulb,
   },
 ];
 
@@ -92,11 +92,11 @@ export const wallpaperTypes = [
 export const floorTypes = [
   {
     name: "강마루",
-    coverage: 0.5,
+    coverage: 0.7,
   },
   {
     name: "원목마루",
-    coverage: 0.45,
+    coverage: 0.65,
   },
 ];
 

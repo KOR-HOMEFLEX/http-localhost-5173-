@@ -1,43 +1,28 @@
-export function ceil(value: number) {
-  return Math.ceil(value);
-}
-
-export function format(value: number, digit = 1) {
-  return value.toLocaleString("ko-KR", {
+export function format(value: number, digit = 2) {
+  return Number(value || 0).toLocaleString("ko-KR", {
     minimumFractionDigits: digit,
     maximumFractionDigits: digit,
   });
 }
 
-export function pyeongToM2(value: number) {
-  return value * 3.3058;
+export function pyeongToMeter(pyeong: number) {
+  return Number(pyeong || 0) * 3.3058;
 }
 
-export function wallpaperCalc({
-  pyeong,
-  height,
-  ceiling,
-  lossRate,
-  coverage,
-}: {
-  pyeong: number;
-  height: number;
-  ceiling: boolean;
-  lossRate: number;
-  coverage: number;
-}) {
-  const floorArea = pyeongToM2(pyeong);
+function getArea(data: any) {
+  if (data.areaMode === "pyeong") {
+    return pyeongToMeter(Number(data.pyeong || 0));
+  }
 
-  const wallArea = floorArea * 1.1 * (height / 2.4);
+  return (Number(data.width || 0) * Number(data.height || 0)) / 1_000_000;
+}
 
-  const totalArea = ceiling
-    ? wallArea + floorArea
-    : wallArea;
-
-  const lossArea =
-    totalArea * (1 + lossRate / 100);
-
-  const rolls = ceil(lossArea / coverage);
+export function wallpaperCalc(data: any) {
+  const floorArea = getArea(data);
+  const wallArea = floorArea * 2.2 * (Number(data.ceilingHeight || 2400) / 2400);
+  const totalArea = wallArea;
+  const lossArea = totalArea * (1 + Number(data.waste || 0) / 100);
+  const rolls = Math.ceil(lossArea / 16.5);
 
   return {
     floorArea,
@@ -48,53 +33,28 @@ export function wallpaperCalc({
   };
 }
 
-export function floorCalc({
-  pyeong,
-  boxArea,
-  lossRate,
-}: {
-  pyeong: number;
-  boxArea: number;
-  lossRate: number;
-}) {
-  const area = pyeongToM2(pyeong);
-
-  const orderPyeong =
-    pyeong * (1 + lossRate / 100);
-
-  const boxes = ceil(orderPyeong / boxArea);
+export function floorCalc(data: any) {
+  const area = getArea(data);
+  const orderArea = area * (1 + Number(data.waste || 0) / 100);
+  const orderPyeong = orderArea / 3.3058;
+  const boxes = Math.ceil(orderPyeong / 0.7);
 
   return {
     area,
+    orderArea,
     orderPyeong,
     boxes,
   };
 }
 
-export function paintCalc({
-  pyeong,
-  coats,
-  coverage,
-  lossRate,
-}: {
-  pyeong: number;
-  coats: number;
-  coverage: number;
-  lossRate: number;
-}) {
-  const wallArea =
-    pyeongToM2(pyeong) * 1.65;
-
-  const paintArea =
-    wallArea * coats;
-
-  const lossArea =
-    paintArea * (1 + lossRate / 100);
-
-  const liters =
-    lossArea / coverage;
-
-  const cans = ceil(liters / 18);
+export function paintCalc(data: any) {
+  const baseArea = getArea(data);
+  const wallArea = baseArea * 1.65;
+  const coats = Number(data.coats || data.coat || 1);
+  const paintArea = wallArea * coats;
+  const lossArea = paintArea * (1 + Number(data.waste || 0) / 100);
+  const liters = lossArea / 10;
+  const cans = Math.ceil(liters / 18);
 
   return {
     wallArea,
@@ -104,29 +64,12 @@ export function paintCalc({
   };
 }
 
-export function woodCalc({
-  width,
-  height,
-  boardArea,
-  layers,
-  lossRate,
-}: {
-  width: number;
-  height: number;
-  boardArea: number;
-  layers: number;
-  lossRate: number;
-}) {
-  const area = width * height;
-
-  const layerArea =
-    area * layers;
-
-  const boards =
-    layerArea / boardArea;
-
-  const orderBoards =
-    ceil(boards * (1 + lossRate / 100));
+export function woodCalc(data: any) {
+  const area = getArea(data);
+  const layers = Number(data.layers || data.layer || 1);
+  const layerArea = area * layers;
+  const boards = layerArea / 1.62;
+  const orderBoards = Math.ceil(boards * (1 + Number(data.waste || 0) / 100));
 
   return {
     area,
@@ -136,25 +79,13 @@ export function woodCalc({
   };
 }
 
-export function furnitureCalc({
-  lower,
-  upper,
-  lossRate,
-  doorWidth,
-}: {
-  lower: number;
-  upper: number;
-  lossRate: number;
-  doorWidth: number;
-}) {
-  const total =
-    lower + upper;
-
-  const order =
-    total * (1 + lossRate / 100);
-
-  const doors =
-    ceil(order / doorWidth);
+export function furnitureCalc(data: any) {
+  const lower = Number(data.lower || data.lowerLength || 0);
+  const upper = Number(data.upper || data.upperLength || 0);
+  const doorWidth = Number(data.doorWidth || 450) / 1000;
+  const total = lower + upper;
+  const order = total * (1 + Number(data.lossRate || data.waste || 5) / 100);
+  const doors = Math.ceil(order / doorWidth);
 
   return {
     total,
@@ -163,26 +94,13 @@ export function furnitureCalc({
   };
 }
 
-export function lightingCalc({
-  pyeong,
-  lux,
-}: {
-  pyeong: number;
-  lux: number;
-}) {
-  const area = pyeongToM2(pyeong);
-
-  const lumen =
-    area * lux;
-
-  const watt =
-    lumen / 90;
-
-  const led7 =
-    ceil(watt / 7);
-
-  const led10 =
-    ceil(watt / 10);
+export function lightingCalc(data: any) {
+  const area = pyeongToMeter(Number(data.pyeong || 0));
+  const lux = Number(data.lux || 220);
+  const lumen = area * lux;
+  const watt = lumen / 90;
+  const led7 = Math.ceil(watt / 7);
+  const led10 = Math.ceil(watt / 10);
 
   return {
     area,
@@ -193,36 +111,18 @@ export function lightingCalc({
   };
 }
 
-export function electricCalc({
-  zones,
-  lightPerZone,
-  outletPerZone,
-  switchPerZone,
-  reserve,
-  dedicated,
-}: {
-  zones: number;
-  lightPerZone: number;
-  outletPerZone: number;
-  switchPerZone: number;
-  reserve: number;
-  dedicated: number;
-}) {
-  const lights =
-    ceil(zones * lightPerZone);
+export function electricCalc(data: any) {
+  const zones = Number(data.zones || data.rooms || 1);
+  const lightPerZone = Number(data.lightPerZone || 1.4);
+  const outletPerZone = Number(data.outletPerZone || 4);
+  const switchPerZone = Number(data.switchPerZone || 1.2);
+  const reserve = Number(data.reserve || 2);
+  const dedicated = Number(data.dedicated || 1);
 
-  const outlets =
-    ceil(zones * outletPerZone);
-
-  const switches =
-    ceil(zones * switchPerZone);
-
-  const total =
-    lights +
-    outlets +
-    switches +
-    reserve +
-    dedicated;
+  const lights = Math.ceil(zones * lightPerZone);
+  const outlets = Math.ceil(zones * outletPerZone);
+  const switches = Math.ceil(zones * switchPerZone);
+  const total = lights + outlets + switches + reserve + dedicated;
 
   return {
     lights,
@@ -232,26 +132,17 @@ export function electricCalc({
   };
 }
 
-export function airconCalc({
-  pyeong,
-  height,
-  correction,
-}: {
-  pyeong: number;
-  height: number;
-  correction: number;
-}) {
-  const heightRate =
-    height > 2.4
-      ? height / 2.4
-      : 1;
+export function airconCalc(data: any) {
+  const pyeong = Number(data.pyeong || 0);
+  const height = Number(data.height || 2.4);
+  const correction = Number(data.correction || 0);
 
-  const result =
-    pyeong *
-    heightRate *
-    (1 + correction / 100);
+  const heightRate = height > 2.4 ? height / 2.4 : 1;
+  const result = pyeong * heightRate * (1 + correction / 100);
 
   return {
+    area: pyeongToMeter(pyeong),
+    pyeong,
     result,
   };
 }
