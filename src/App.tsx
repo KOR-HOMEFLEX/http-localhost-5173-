@@ -1,162 +1,116 @@
 import { useMemo, useState } from "react";
-import { Calculator, Copy, RotateCcw } from "lucide-react";
 import "./styles.css";
 
 import {
   categories,
+  defaultInputs,
   wallpaperTypes,
   floorTypes,
   boardTypes,
   paintTypes,
-  luxPresets,
   furnitureTypes,
+  luxPresets,
+  type AreaMode,
+  type AirconInputs,
+  type AirconType,
+  type AirconUse,
   type CategoryKey,
+  type ElectricInputs,
+  type FloorInputs,
+  type FurnitureInputs,
+  type Inputs,
+  type LightInstallType,
+  type LightingInputs,
+  type PaintInputs,
+  type PaintTarget,
+  type TileInputs,
+  type TileTarget,
+  type WallpaperInputs,
+  type WoodInputs,
+  type WoodMode,
 } from "./data";
 
 import {
   airconCalc,
   electricCalc,
   floorCalc,
-  format,
   furnitureCalc,
   lightingCalc,
   paintCalc,
+  tileCalc,
   wallpaperCalc,
   woodCalc,
 } from "./calculators";
 
-type ResultItem = {
-  label: string;
-  value: string;
-};
-
-type ResultView = {
+type CalcResult = {
   mainLabel: string;
   mainValue: string;
-  helper: string;
-  items: ResultItem[];
+  mainUnit: string;
+  subText: string;
+  cards: {
+    label: string;
+    value: string;
+  }[];
+  note: string;
+  chips: string[];
 };
 
-type Inputs = {
-  wallpaper: {
-    wallpaperTypeIndex: number;
-    pyeong: number;
-    height: number;
-    ceiling: number;
-    lossRate: number;
-  };
-  floor: {
-    floorTypeIndex: number;
-    pyeong: number;
-    lossRate: number;
-  };
-  paint: {
-    paintTypeIndex: number;
-    pyeong: number;
-    coats: number;
-    lossRate: number;
-  };
-  wood: {
-    boardTypeIndex: number;
-    width: number;
-    height: number;
-    layers: number;
-    lossRate: number;
-  };
-  furniture: {
-    furnitureTypeIndex: number;
-    lower: number;
-    upper: number;
-    lossRate: number;
-    doorWidth: number;
-  };
-  lighting: {
-    luxPresetIndex: number;
-    pyeong: number;
-  };
-  electric: {
-    zones: number;
-    lightPerZone: number;
-    outletPerZone: number;
-    switchPerZone: number;
-    reserve: number;
-    dedicated: number;
-  };
-  aircon: {
-    pyeong: number;
-    height: number;
-    correction: number;
-  };
-  tile: {
-    area: number;
-    tileWidth: number;
-    tileHeight: number;
-    piecesPerBox: number;
-    lossRate: number;
-  };
-};
+const cloneInputs = (): Inputs => JSON.parse(JSON.stringify(defaultInputs));
 
-const defaultInputs: Inputs = {
-  wallpaper: {
-    wallpaperTypeIndex: 0,
-    pyeong: 24,
-    height: 2.4,
-    ceiling: 0,
-    lossRate: 0,
-  },
-  floor: {
-    floorTypeIndex: 1,
-    pyeong: 20,
-    lossRate: 7,
-  },
-  paint: {
-    paintTypeIndex: 0,
-    pyeong: 24,
-    coats: 2,
-    lossRate: 0,
-  },
-  wood: {
-    boardTypeIndex: 0,
-    width: 5,
-    height: 4,
-    layers: 1,
-    lossRate: 10,
-  },
-  furniture: {
-    furnitureTypeIndex: 0,
-    lower: 3.2,
-    upper: 2.4,
-    lossRate: 5,
-    doorWidth: 0.45,
-  },
-  lighting: {
-    luxPresetIndex: 0,
-    pyeong: 10,
-  },
-  electric: {
-    zones: 4,
-    lightPerZone: 1.4,
-    outletPerZone: 4,
-    switchPerZone: 1.2,
-    reserve: 2,
-    dedicated: 1,
-  },
-  aircon: {
-    pyeong: 18,
-    height: 2.4,
-    correction: 0,
-  },
-  tile: {
-    area: 12,
-    tileWidth: 600,
-    tileHeight: 600,
-    piecesPerBox: 4,
-    lossRate: 10,
-  },
-};
+function NumberField({
+  label,
+  value,
+  suffix,
+  onChange,
+  full = false,
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+  onChange: (value: number) => void;
+  full?: boolean;
+}) {
+  return (
+    <label className={`field ${full ? "full" : ""}`}>
+      <span className="field-label">{label}</span>
+      <div className="field-control">
+        <input
+          type="number"
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+        />
+        {suffix && <em>{suffix}</em>}
+      </div>
+    </label>
+  );
+}
 
-function safeNumber(value: number) {
-  return Number.isFinite(value) && value >= 0 ? value : 0;
+function TextField({
+  label,
+  value,
+  placeholder,
+  onChange,
+  full = false,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+  full?: boolean;
+}) {
+  return (
+    <label className={`field ${full ? "full" : ""}`}>
+      <span className="field-label">{label}</span>
+      <div className="field-control">
+        <input
+          type="text"
+          value={value}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+    </label>
+  );
 }
 
 function SelectField({
@@ -164,19 +118,21 @@ function SelectField({
   value,
   options,
   onChange,
+  full = false,
 }: {
   label: string;
-  value: number;
+  value: string;
   options: string[];
-  onChange: (value: number) => void;
+  onChange: (value: string) => void;
+  full?: boolean;
 }) {
   return (
-    <label>
+    <label className={`field ${full ? "full" : ""}`}>
       <span className="field-label">{label}</span>
       <div className="field-control">
-        <select value={value} onChange={(event) => onChange(Number(event.target.value))}>
-          {options.map((option, index) => (
-            <option key={option} value={index}>
+        <select value={value} onChange={(event) => onChange(event.target.value)}>
+          {options.map((option) => (
+            <option key={option} value={option}>
               {option}
             </option>
           ))}
@@ -186,71 +142,75 @@ function SelectField({
   );
 }
 
-function NumberField({
+function ToggleGroup<T extends string>({
   label,
   value,
-  suffix,
+  options,
   onChange,
+  full = false,
 }: {
   label: string;
-  value: number;
-  suffix: string;
-  onChange: (value: number) => void;
+  value: T;
+  options: { label: string; value: T }[];
+  onChange: (value: T) => void;
+  full?: boolean;
 }) {
   return (
-    <label>
+    <div className={`field ${full ? "full" : ""}`}>
       <span className="field-label">{label}</span>
-      <div className="field-control">
-        <input
-          type="number"
-          value={value}
-          onChange={(event) => onChange(safeNumber(Number(event.target.value)))}
-        />
-        <em>{suffix}</em>
+      <div className="toggle-row">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`toggle-btn ${value === option.value ? "active" : ""}`}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
-    </label>
+    </div>
   );
 }
 
-function ToggleField({
+function CheckToggle({
   label,
-  value,
+  checked,
   onChange,
 }: {
   label: string;
-  value: number;
-  onChange: (value: number) => void;
+  checked: boolean;
+  onChange: (value: boolean) => void;
 }) {
   return (
-    <label>
-      <span className="field-label">{label}</span>
-      <div className="field-control">
-        <select value={value} onChange={(event) => onChange(Number(event.target.value))}>
-          <option value={0}>미포함</option>
-          <option value={1}>포함</option>
-        </select>
-      </div>
-    </label>
+    <button
+      type="button"
+      className={`toggle-btn ${checked ? "active" : ""}`}
+      onClick={() => onChange(!checked)}
+    >
+      {label}
+    </button>
   );
 }
 
 export default function App() {
-  const [category, setCategory] = useState<CategoryKey>("wallpaper");
-  const [inputs, setInputs] = useState<Inputs>(defaultInputs);
+  const [category, setCategory] = useState<CategoryKey>("wood");
+  const [inputs, setInputs] = useState<Inputs>(() => cloneInputs());
   const [copied, setCopied] = useState(false);
 
-  const selectedCategory = categories.find((item) => item.key === category) ?? categories[1];
+  const selectedCategory =
+    categories.find((item) => item.key === category) ?? categories[0];
 
-  const update = <T extends keyof Inputs>(
+  const updateGroup = <T extends CategoryKey>(
     group: T,
-    key: keyof Inputs[T],
-    value: number
+    patch: Partial<Inputs[T]>
   ) => {
     setInputs((prev) => ({
       ...prev,
       [group]: {
         ...prev[group],
-        [key]: value,
+        ...patch,
       },
     }));
   };
@@ -258,243 +218,28 @@ export default function App() {
   const resetCurrent = () => {
     setInputs((prev) => ({
       ...prev,
-      [category]: defaultInputs[category],
+      [category]: cloneInputs()[category],
     }));
   };
 
-  void resetCurrent;
-
-  const result: ResultView = useMemo(() => {
-    if (category === "wallpaper") {
-      const value = inputs.wallpaper;
-      const type = wallpaperTypes[value.wallpaperTypeIndex] ?? wallpaperTypes[0];
-
-      const calc = wallpaperCalc({
-        pyeong: value.pyeong,
-        height: value.height,
-        ceiling: value.ceiling === 1,
-        lossRate: value.lossRate,
-        coverage: type.coverage,
-      });
-
-      return {
-        mainLabel: "발주 권장 롤 수",
-        mainValue: `${calc.rolls} 롤`,
-        helper: "벽면 면적 기준으로 필요한 벽지 롤 수를 계산합니다.",
-        items: [
-          { label: "벽지 종류", value: type.name },
-          { label: "바닥 면적", value: `${format(calc.floorArea)} ㎡` },
-          { label: "벽면 면적", value: `${format(calc.wallArea)} ㎡` },
-          { label: "총 도배 면적", value: `${format(calc.totalArea)} ㎡` },
-          { label: "로스 포함 면적", value: `${format(calc.lossArea)} ㎡` },
-          { label: "롤당 시공 면적", value: `${format(type.coverage)} ㎡` },
-        ],
-      };
-    }
-
-    if (category === "floor") {
-      const value = inputs.floor;
-      const type = floorTypes[value.floorTypeIndex] ?? floorTypes[1];
-
-      const calc = floorCalc({
-        pyeong: value.pyeong,
-        boxArea: type.coverage,
-        lossRate: value.lossRate,
-      });
-
-      return {
-        mainLabel: "발주 권장 박스 수",
-        mainValue: `${calc.boxes} 박스`,
-        helper: "시공 평수에 로스율을 반영해 박스 수를 계산합니다.",
-        items: [
-          { label: "마루 종류", value: type.name },
-          { label: "시공 면적", value: `${format(calc.area)} ㎡` },
-          { label: "시공 평수", value: `${format(value.pyeong)} 평` },
-          { label: "발주 평수", value: `${format(calc.orderPyeong)} 평` },
-          { label: "박스당 면적", value: `${format(type.coverage)} 평` },
-          { label: "로스율", value: `${format(value.lossRate, 0)}%` },
-        ],
-      };
-    }
-
-    if (category === "paint") {
-      const value = inputs.paint;
-      const type = paintTypes[value.paintTypeIndex] ?? paintTypes[0];
-
-      const calc = paintCalc({
-        pyeong: value.pyeong,
-        coats: value.coats,
-        coverage: type.coverage,
-        lossRate: value.lossRate,
-      });
-
-      return {
-        mainLabel: "발주 권장 말통 수",
-        mainValue: `${calc.cans} 통`,
-        helper: "도장 면적과 도장 횟수를 기준으로 필요한 페인트 용량을 계산합니다.",
-        items: [
-          { label: "페인트 종류", value: type.name },
-          { label: "시공 면적", value: `${format(calc.wallArea)} ㎡` },
-          { label: "총 도장 면적", value: `${format(calc.paintArea)} ㎡` },
-          { label: "필요 리터", value: `${format(calc.liters)} L` },
-          { label: "도장 횟수", value: `${format(value.coats, 0)} 회` },
-          { label: "1L 도포 면적", value: `${format(type.coverage)} ㎡` },
-        ],
-      };
-    }
-
-    if (category === "wood") {
-      const value = inputs.wood;
-      const type = boardTypes[value.boardTypeIndex] ?? boardTypes[0];
-
-      const calc = woodCalc({
-        width: value.width,
-        height: value.height,
-        boardArea: type.area,
-        layers: value.layers,
-        lossRate: value.lossRate,
-      });
-
-      return {
-        mainLabel: "발주 권장 장수",
-        mainValue: `${calc.orderBoards} 장`,
-        helper: "작업 면적과 보드 규격, 겹수, 로스율을 반영합니다.",
-        items: [
-          { label: "보드 종류", value: type.name },
-          { label: "작업 면적", value: `${format(calc.area)} ㎡` },
-          { label: "레이어 반영 면적", value: `${format(calc.layerArea)} ㎡` },
-          { label: "순수 필요량", value: `${format(calc.boards)} 장` },
-          { label: "보드 1장 면적", value: `${format(type.area)} ㎡` },
-          { label: "로스율", value: `${format(value.lossRate, 0)}%` },
-        ],
-      };
-    }
-
-    if (category === "furniture") {
-      const value = inputs.furniture;
-      const type = furnitureTypes[value.furnitureTypeIndex] ?? furnitureTypes[0];
-
-      const calc = furnitureCalc({
-        lower: value.lower,
-        upper: value.upper,
-        lossRate: value.lossRate,
-        doorWidth: value.doorWidth,
-      });
-
-      return {
-        mainLabel: "발주 권장 길이",
-        mainValue: `${format(calc.order)} m`,
-        helper: "하부장과 상부장 길이에 여유율을 반영합니다.",
-        items: [
-          { label: "가구 종류", value: type.name },
-          { label: "기본 길이", value: `${format(calc.total)} m` },
-          { label: "발주 길이", value: `${format(calc.order)} m` },
-          { label: "도어 예상 수", value: `${calc.doors} 개` },
-          { label: "도어 폭", value: `${format(value.doorWidth)} m` },
-          { label: "여유율", value: `${format(value.lossRate, 0)}%` },
-        ],
-      };
-    }
-
-    if (category === "lighting") {
-      const value = inputs.lighting;
-      const preset = luxPresets[value.luxPresetIndex] ?? luxPresets[0];
-
-      const calc = lightingCalc({
-        pyeong: value.pyeong,
-        lux: preset.lux,
-      });
-
-      return {
-        mainLabel: "권장 LED 용량",
-        mainValue: `${Math.ceil(calc.watt)} W`,
-        helper: "공간 면적과 권장 조도를 기준으로 LED 용량을 계산합니다.",
-        items: [
-          { label: "공간 용도", value: preset.name },
-          { label: "공간 면적", value: `${format(calc.area)} ㎡` },
-          { label: "권장 조도", value: `${format(preset.lux, 0)} lux` },
-          { label: "필요 광량", value: `${format(calc.lumen, 0)} lm` },
-          { label: "7W LED 수량", value: `${calc.led7} 개` },
-          { label: "10W LED 수량", value: `${calc.led10} 개` },
-        ],
-      };
-    }
-
-    if (category === "electric") {
-      const value = inputs.electric;
-
-      const calc = electricCalc({
-        zones: value.zones,
-        lightPerZone: value.lightPerZone,
-        outletPerZone: value.outletPerZone,
-        switchPerZone: value.switchPerZone,
-        reserve: value.reserve,
-        dedicated: value.dedicated,
-      });
-
-      return {
-        mainLabel: "총 전기 포인트",
-        mainValue: `${calc.total} 개`,
-        helper: "구역 수를 기준으로 조명, 콘센트, 스위치 포인트를 계산합니다.",
-        items: [
-          { label: "조명 포인트", value: `${calc.lights} 개` },
-          { label: "콘센트 포인트", value: `${calc.outlets} 개` },
-          { label: "스위치 포인트", value: `${calc.switches} 개` },
-          { label: "예비 포인트", value: `${format(value.reserve, 0)} 개` },
-          { label: "전용 회로", value: `${format(value.dedicated, 0)} 개` },
-          { label: "구역 수", value: `${format(value.zones, 0)} 구역` },
-        ],
-      };
-    }
-
-    if (category === "aircon") {
-      const value = inputs.aircon;
-
-      const calc = airconCalc({
-        pyeong: value.pyeong,
-        height: value.height,
-        correction: value.correction,
-      });
-
-      return {
-        mainLabel: "권장 냉방 평형",
-        mainValue: `${Math.ceil(calc.result)} 평형`,
-        helper: "기본 평수에 층고와 보정률을 반영합니다.",
-        items: [
-          { label: "기본 면적", value: `${format(value.pyeong)} 평` },
-          { label: "층고", value: `${format(value.height)} m` },
-          { label: "상향 보정률", value: `${format(value.correction, 0)}%` },
-          { label: "계산 결과", value: `${format(calc.result)} 평형` },
-        ],
-      };
-    }
-
-    const value = inputs.tile;
-    const tileArea = (value.tileWidth / 1000) * (value.tileHeight / 1000);
-    const purePieces = tileArea > 0 ? value.area / tileArea : 0;
-    const orderPieces = purePieces * (1 + value.lossRate / 100);
-    const boxes = value.piecesPerBox > 0 ? Math.ceil(orderPieces / value.piecesPerBox) : 0;
-
-    return {
-      mainLabel: "발주 권장 매수",
-      mainValue: `${Math.ceil(orderPieces)} 매`,
-      helper: "시공 면적과 타일 규격, 로스율을 반영합니다.",
-      items: [
-        { label: "시공 면적", value: `${format(value.area)} ㎡` },
-        { label: "타일 1장 면적", value: `${format(tileArea)} ㎡` },
-        { label: "순수 필요량", value: `${format(purePieces)} 매` },
-        { label: "권장 박스 수", value: `${boxes} 박스` },
-        { label: "박스당 장수", value: `${format(value.piecesPerBox, 0)} 장` },
-        { label: "로스율", value: `${format(value.lossRate, 0)}%` },
-      ],
-    };
+  const result: CalcResult = useMemo(() => {
+    if (category === "wood") return woodCalc(inputs.wood);
+    if (category === "electric") return electricCalc(inputs.electric);
+    if (category === "aircon") return airconCalc(inputs.aircon);
+    if (category === "paint") return paintCalc(inputs.paint);
+    if (category === "wallpaper") return wallpaperCalc(inputs.wallpaper);
+    if (category === "floor") return floorCalc(inputs.floor);
+    if (category === "tile") return tileCalc(inputs.tile);
+    if (category === "furniture") return furnitureCalc(inputs.furniture);
+    return lightingCalc(inputs.lighting);
   }, [category, inputs]);
 
   const copyResult = async () => {
     const lines = [
       `[${selectedCategory.label} 계산 결과]`,
-      `${result.mainLabel}: ${result.mainValue}`,
-      ...result.items.map((item) => `${item.label}: ${item.value}`),
+      `${result.mainLabel}: ${result.mainValue}${result.mainUnit}`,
+      ...result.cards.map((card) => `${card.label}: ${card.value}`),
+      `메모: ${result.note}`,
     ];
 
     await navigator.clipboard.writeText(lines.join(String.fromCharCode(10)));
@@ -502,27 +247,903 @@ export default function App() {
     setTimeout(() => setCopied(false), 1200);
   };
 
+  const commonFields = (group: CategoryKey) => {
+    const current = inputs[group] as { siteName: string; spaceName: string };
+
+    return (
+      <>
+        <TextField
+          label="현장명"
+          value={current.siteName}
+          placeholder="예: HOMEFLEX 현장"
+          onChange={(value) =>
+            updateGroup(group, { siteName: value } as Partial<Inputs[typeof group]>)
+          }
+        />
+        <TextField
+          label="공간명"
+          value={current.spaceName}
+          placeholder="예: 거실 / 욕실 / 주방"
+          onChange={(value) =>
+            updateGroup(group, { spaceName: value } as Partial<Inputs[typeof group]>)
+          }
+        />
+      </>
+    );
+  };
+
+  const renderWoodForm = () => {
+    const value: WoodInputs = inputs.wood;
+
+    return (
+      <>
+        {commonFields("wood")}
+
+        <ToggleGroup<WoodMode>
+          label="산출 종류"
+          value={value.mode}
+          full
+          options={[
+            { label: "보드", value: "board" },
+            { label: "몰딩/걸레받이", value: "molding" },
+            { label: "가벽틀", value: "partition" },
+          ]}
+          onChange={(mode) => updateGroup("wood", { mode })}
+        />
+
+        {value.mode === "board" && (
+          <>
+            <SelectField
+              label="보드 규격"
+              value={value.boardType}
+              options={boardTypes.map((item) => item.name)}
+              onChange={(boardType) => {
+                const board = boardTypes.find((item) => item.name === boardType);
+                updateGroup("wood", {
+                  boardType,
+                  boardWidth: board?.width ?? value.boardWidth,
+                  boardHeight: board?.height ?? value.boardHeight,
+                });
+              }}
+            />
+
+            <ToggleGroup<AreaMode>
+              label="면적 입력 방식"
+              value={value.areaMode}
+              options={[
+                { label: "평수", value: "pyeong" },
+                { label: "가로 × 세로", value: "size" },
+              ]}
+              onChange={(areaMode) => updateGroup("wood", { areaMode })}
+            />
+
+            {value.areaMode === "pyeong" ? (
+              <NumberField
+                label="시공 평수"
+                value={value.pyeong}
+                suffix="평"
+                onChange={(pyeong) => updateGroup("wood", { pyeong })}
+              />
+            ) : (
+              <>
+                <NumberField
+                  label="가로"
+                  value={value.width}
+                  suffix="m"
+                  onChange={(width) => updateGroup("wood", { width })}
+                />
+                <NumberField
+                  label="세로"
+                  value={value.height}
+                  suffix="m"
+                  onChange={(height) => updateGroup("wood", { height })}
+                />
+              </>
+            )}
+
+            <NumberField
+              label="겹수"
+              value={value.boardLayers}
+              suffix="겹"
+              onChange={(boardLayers) => updateGroup("wood", { boardLayers })}
+            />
+            <NumberField
+              label="여유율"
+              value={value.lossRate}
+              suffix="%"
+              onChange={(lossRate) => updateGroup("wood", { lossRate })}
+            />
+          </>
+        )}
+
+        {value.mode === "molding" && (
+          <>
+            <NumberField
+              label="총 길이"
+              value={value.moldingTotalLength}
+              suffix="m"
+              onChange={(moldingTotalLength) =>
+                updateGroup("wood", { moldingTotalLength })
+              }
+            />
+            <NumberField
+              label="자재 한 본 길이"
+              value={value.moldingPieceLength}
+              suffix="m"
+              onChange={(moldingPieceLength) =>
+                updateGroup("wood", { moldingPieceLength })
+              }
+            />
+            <NumberField
+              label="여유율"
+              value={value.lossRate}
+              suffix="%"
+              onChange={(lossRate) => updateGroup("wood", { lossRate })}
+            />
+          </>
+        )}
+
+        {value.mode === "partition" && (
+          <>
+            <NumberField
+              label="가벽 폭"
+              value={value.partitionWidth}
+              suffix="m"
+              onChange={(partitionWidth) =>
+                updateGroup("wood", { partitionWidth })
+              }
+            />
+            <NumberField
+              label="가벽 높이"
+              value={value.partitionHeight}
+              suffix="m"
+              onChange={(partitionHeight) =>
+                updateGroup("wood", { partitionHeight })
+              }
+            />
+            <NumberField
+              label="스터드 간격"
+              value={value.studSpacing}
+              suffix="mm"
+              onChange={(studSpacing) => updateGroup("wood", { studSpacing })}
+            />
+            <NumberField
+              label="자재 한 본 길이"
+              value={value.studPieceLength}
+              suffix="m"
+              onChange={(studPieceLength) =>
+                updateGroup("wood", { studPieceLength })
+              }
+            />
+            <NumberField
+              label="여유율"
+              value={value.lossRate}
+              suffix="%"
+              onChange={(lossRate) => updateGroup("wood", { lossRate })}
+            />
+          </>
+        )}
+      </>
+    );
+  };
+
+  const renderElectricForm = () => {
+    const value: ElectricInputs = inputs.electric;
+
+    return (
+      <>
+        {commonFields("electric")}
+
+        <SelectField
+          label="현장 유형"
+          value={value.siteType}
+          options={["주거/아파트", "상가/사무실", "숙박/상업공간"]}
+          onChange={(siteType) => updateGroup("electric", { siteType })}
+        />
+        <NumberField
+          label="공간/구역 수"
+          value={value.zones}
+          suffix="구역"
+          onChange={(zones) => updateGroup("electric", { zones })}
+        />
+        <NumberField
+          label="조명 / 구역"
+          value={value.lightPerZone}
+          suffix="개"
+          onChange={(lightPerZone) => updateGroup("electric", { lightPerZone })}
+        />
+        <NumberField
+          label="콘센트 / 구역"
+          value={value.outletPerZone}
+          suffix="개"
+          onChange={(outletPerZone) =>
+            updateGroup("electric", { outletPerZone })
+          }
+        />
+        <NumberField
+          label="스위치 / 구역"
+          value={value.switchPerZone}
+          suffix="개"
+          onChange={(switchPerZone) =>
+            updateGroup("electric", { switchPerZone })
+          }
+        />
+        <NumberField
+          label="예비 포인트"
+          value={value.sparePoints}
+          suffix="개"
+          onChange={(sparePoints) => updateGroup("electric", { sparePoints })}
+        />
+
+        <div className="field full">
+          <span className="field-label">전용회로 후보</span>
+          <div className="toggle-row">
+            <CheckToggle
+              label="에어컨"
+              checked={value.airconCircuit}
+              onChange={(airconCircuit) =>
+                updateGroup("electric", { airconCircuit })
+              }
+            />
+            <CheckToggle
+              label="인덕션/오븐"
+              checked={value.inductionCircuit}
+              onChange={(inductionCircuit) =>
+                updateGroup("electric", { inductionCircuit })
+              }
+            />
+            <CheckToggle
+              label="세탁·건조기"
+              checked={value.laundryCircuit}
+              onChange={(laundryCircuit) =>
+                updateGroup("electric", { laundryCircuit })
+              }
+            />
+            <CheckToggle
+              label="욕실 고정기기"
+              checked={value.bathroomCircuit}
+              onChange={(bathroomCircuit) =>
+                updateGroup("electric", { bathroomCircuit })
+              }
+            />
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderAirconForm = () => {
+    const value: AirconInputs = inputs.aircon;
+
+    return (
+      <>
+        {commonFields("aircon")}
+
+        <ToggleGroup<AirconUse>
+          label="사용 목적"
+          value={value.useType}
+          options={[
+            { label: "가정용", value: "home" },
+            { label: "상업용", value: "commercial" },
+          ]}
+          onChange={(useType) => updateGroup("aircon", { useType })}
+        />
+
+        <ToggleGroup<AirconType>
+          label="에어컨 종류"
+          value={value.airconType}
+          options={[
+            { label: "스탠드", value: "stand" },
+            { label: "시스템", value: "system" },
+          ]}
+          onChange={(airconType) => updateGroup("aircon", { airconType })}
+        />
+
+        {value.useType === "commercial" && (
+          <SelectField
+            label="상업공간 종류"
+            value={value.commercialType}
+            options={["사무실", "매장", "식당/카페", "학원/병원"]}
+            onChange={(commercialType) =>
+              updateGroup("aircon", { commercialType })
+            }
+          />
+        )}
+
+        <NumberField
+          label="냉방 면적"
+          value={value.coolingPyeong}
+          suffix="평"
+          onChange={(coolingPyeong) =>
+            updateGroup("aircon", { coolingPyeong })
+          }
+        />
+
+        <SelectField
+          label="햇빛 노출"
+          value={value.sunExposure}
+          options={["북향·약함", "동향·일반", "남향·보통", "서향·강함"]}
+          onChange={(sunExposure) => updateGroup("aircon", { sunExposure })}
+        />
+
+        <NumberField
+          label="천장 높이"
+          value={value.ceilingHeight}
+          suffix="m"
+          onChange={(ceilingHeight) =>
+            updateGroup("aircon", { ceilingHeight })
+          }
+        />
+
+        <div className="field full">
+          <span className="field-label">보정 조건</span>
+          <div className="toggle-row">
+            <CheckToggle
+              label="거실+주방 오픈형"
+              checked={value.openLivingKitchen}
+              onChange={(openLivingKitchen) =>
+                updateGroup("aircon", { openLivingKitchen })
+              }
+            />
+            <CheckToggle
+              label="탑층 또는 단열취약"
+              checked={value.topFloorOrWeakInsulation}
+              onChange={(topFloorOrWeakInsulation) =>
+                updateGroup("aircon", { topFloorOrWeakInsulation })
+              }
+            />
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderPaintForm = () => {
+    const value: PaintInputs = inputs.paint;
+
+    return (
+      <>
+        {commonFields("paint")}
+
+        <SelectField
+          label="페인트 종류"
+          value={value.paintType}
+          options={paintTypes.map((item) => item.name)}
+          onChange={(paintType) => updateGroup("paint", { paintType })}
+        />
+
+        <ToggleGroup<PaintTarget>
+          label="시공 부위"
+          value={value.target}
+          options={[
+            { label: "벽", value: "wall" },
+            { label: "천장", value: "ceiling" },
+            { label: "직접 면적", value: "direct" },
+          ]}
+          onChange={(target) => updateGroup("paint", { target })}
+        />
+
+        {value.target !== "direct" && (
+          <ToggleGroup<AreaMode>
+            label="면적 입력 방식"
+            value={value.areaMode}
+            options={[
+              { label: "평수", value: "pyeong" },
+              { label: "가로 × 세로", value: "size" },
+            ]}
+            onChange={(areaMode) => updateGroup("paint", { areaMode })}
+          />
+        )}
+
+        {value.target === "direct" ? (
+          <NumberField
+            label="직접 입력 면적"
+            value={value.directArea}
+            suffix="㎡"
+            onChange={(directArea) => updateGroup("paint", { directArea })}
+          />
+        ) : value.areaMode === "pyeong" ? (
+          <NumberField
+            label="실 평수"
+            value={value.pyeong}
+            suffix="평"
+            onChange={(pyeong) => updateGroup("paint", { pyeong })}
+          />
+        ) : (
+          <>
+            <NumberField
+              label="가로"
+              value={value.width}
+              suffix="m"
+              onChange={(width) => updateGroup("paint", { width })}
+            />
+            <NumberField
+              label="세로"
+              value={value.height}
+              suffix="m"
+              onChange={(height) => updateGroup("paint", { height })}
+            />
+          </>
+        )}
+
+        <NumberField
+          label="천장 높이"
+          value={value.ceilingHeight}
+          suffix="m"
+          onChange={(ceilingHeight) =>
+            updateGroup("paint", { ceilingHeight })
+          }
+        />
+        <NumberField
+          label="도장 횟수"
+          value={value.coats}
+          suffix="회"
+          onChange={(coats) => updateGroup("paint", { coats })}
+        />
+        <NumberField
+          label="로스율"
+          value={value.lossRate}
+          suffix="%"
+          onChange={(lossRate) => updateGroup("paint", { lossRate })}
+        />
+      </>
+    );
+  };
+
+  const renderWallpaperForm = () => {
+    const value: WallpaperInputs = inputs.wallpaper;
+
+    return (
+      <>
+        {commonFields("wallpaper")}
+
+        <SelectField
+          label="벽지 종류"
+          value={value.wallpaperType}
+          options={wallpaperTypes.map((item) => item.name)}
+          onChange={(wallpaperType) =>
+            updateGroup("wallpaper", { wallpaperType })
+          }
+        />
+
+        <ToggleGroup<AreaMode>
+          label="면적 입력 방식"
+          value={value.areaMode}
+          options={[
+            { label: "평수", value: "pyeong" },
+            { label: "가로 × 세로", value: "size" },
+          ]}
+          onChange={(areaMode) => updateGroup("wallpaper", { areaMode })}
+        />
+
+        {value.areaMode === "pyeong" ? (
+          <NumberField
+            label="시공 평수"
+            value={value.pyeong}
+            suffix="평"
+            onChange={(pyeong) => updateGroup("wallpaper", { pyeong })}
+          />
+        ) : (
+          <>
+            <NumberField
+              label="가로"
+              value={value.width}
+              suffix="m"
+              onChange={(width) => updateGroup("wallpaper", { width })}
+            />
+            <NumberField
+              label="세로"
+              value={value.height}
+              suffix="m"
+              onChange={(height) => updateGroup("wallpaper", { height })}
+            />
+          </>
+        )}
+
+        <NumberField
+          label="천장 높이"
+          value={value.ceilingHeight}
+          suffix="m"
+          onChange={(ceilingHeight) =>
+            updateGroup("wallpaper", { ceilingHeight })
+          }
+        />
+
+        <div className="field">
+          <span className="field-label">천장 도배 포함</span>
+          <div className="toggle-row">
+            <CheckToggle
+              label="천장 포함"
+              checked={value.includeCeiling}
+              onChange={(includeCeiling) =>
+                updateGroup("wallpaper", { includeCeiling })
+              }
+            />
+          </div>
+        </div>
+
+        <NumberField
+          label="로스율"
+          value={value.lossRate}
+          suffix="%"
+          onChange={(lossRate) => updateGroup("wallpaper", { lossRate })}
+        />
+      </>
+    );
+  };
+
+  const renderFloorForm = () => {
+    const value: FloorInputs = inputs.floor;
+
+    return (
+      <>
+        {commonFields("floor")}
+
+        <SelectField
+          label="마루 종류"
+          value={value.floorType}
+          options={floorTypes.map((item) => item.name)}
+          onChange={(floorType) => {
+            const floor = floorTypes.find((item) => item.name === floorType);
+            updateGroup("floor", {
+              floorType,
+              boxCoverage: floor?.coverage ?? value.boxCoverage,
+            });
+          }}
+        />
+
+        <NumberField
+          label="박스당 면적"
+          value={value.boxCoverage}
+          suffix="평"
+          onChange={(boxCoverage) => updateGroup("floor", { boxCoverage })}
+        />
+
+        <ToggleGroup<AreaMode>
+          label="면적 입력 방식"
+          value={value.areaMode}
+          options={[
+            { label: "평수", value: "pyeong" },
+            { label: "가로 × 세로", value: "size" },
+          ]}
+          onChange={(areaMode) => updateGroup("floor", { areaMode })}
+        />
+
+        {value.areaMode === "pyeong" ? (
+          <NumberField
+            label="시공 평수"
+            value={value.pyeong}
+            suffix="평"
+            onChange={(pyeong) => updateGroup("floor", { pyeong })}
+          />
+        ) : (
+          <>
+            <NumberField
+              label="가로"
+              value={value.width}
+              suffix="m"
+              onChange={(width) => updateGroup("floor", { width })}
+            />
+            <NumberField
+              label="세로"
+              value={value.height}
+              suffix="m"
+              onChange={(height) => updateGroup("floor", { height })}
+            />
+          </>
+        )}
+
+        <NumberField
+          label="실 둘레"
+          value={value.roomPerimeter}
+          suffix="m"
+          onChange={(roomPerimeter) =>
+            updateGroup("floor", { roomPerimeter })
+          }
+        />
+        <NumberField
+          label="로스율"
+          value={value.lossRate}
+          suffix="%"
+          onChange={(lossRate) => updateGroup("floor", { lossRate })}
+        />
+      </>
+    );
+  };
+
+  const renderTileForm = () => {
+    const value: TileInputs = inputs.tile;
+
+    return (
+      <>
+        {commonFields("tile")}
+
+        <ToggleGroup<TileTarget>
+          label="시공 부위"
+          value={value.target}
+          options={[
+            { label: "바닥", value: "floor" },
+            { label: "벽", value: "wall" },
+          ]}
+          onChange={(target) => updateGroup("tile", { target })}
+        />
+
+        <ToggleGroup<AreaMode>
+          label="면적 입력 방식"
+          value={value.areaMode}
+          options={[
+            { label: "평수", value: "pyeong" },
+            { label: "가로 × 세로", value: "size" },
+          ]}
+          onChange={(areaMode) => updateGroup("tile", { areaMode })}
+        />
+
+        {value.areaMode === "pyeong" ? (
+          <NumberField
+            label="시공 평수"
+            value={value.pyeong}
+            suffix="평"
+            onChange={(pyeong) => updateGroup("tile", { pyeong })}
+          />
+        ) : (
+          <>
+            <NumberField
+              label="가로"
+              value={value.width}
+              suffix="m"
+              onChange={(width) => updateGroup("tile", { width })}
+            />
+            <NumberField
+              label="세로"
+              value={value.height}
+              suffix="m"
+              onChange={(height) => updateGroup("tile", { height })}
+            />
+          </>
+        )}
+
+        <NumberField
+          label="타일 가로"
+          value={value.tileWidth}
+          suffix="mm"
+          onChange={(tileWidth) => updateGroup("tile", { tileWidth })}
+        />
+        <NumberField
+          label="타일 세로"
+          value={value.tileHeight}
+          suffix="mm"
+          onChange={(tileHeight) => updateGroup("tile", { tileHeight })}
+        />
+        <NumberField
+          label="박스당 매수"
+          value={value.piecesPerBox}
+          suffix="매"
+          onChange={(piecesPerBox) =>
+            updateGroup("tile", { piecesPerBox })
+          }
+        />
+        <NumberField
+          label="접착제 1포/통 시공량"
+          value={value.adhesiveCoverage}
+          suffix="㎡"
+          onChange={(adhesiveCoverage) =>
+            updateGroup("tile", { adhesiveCoverage })
+          }
+        />
+        <NumberField
+          label="메지 폭"
+          value={value.groutWidth}
+          suffix="mm"
+          onChange={(groutWidth) => updateGroup("tile", { groutWidth })}
+        />
+        <NumberField
+          label="메지 깊이"
+          value={value.groutDepth}
+          suffix="mm"
+          onChange={(groutDepth) => updateGroup("tile", { groutDepth })}
+        />
+        <NumberField
+          label="실리콘 길이"
+          value={value.siliconLength}
+          suffix="m"
+          onChange={(siliconLength) =>
+            updateGroup("tile", { siliconLength })
+          }
+        />
+        <NumberField
+          label="로스율"
+          value={value.lossRate}
+          suffix="%"
+          onChange={(lossRate) => updateGroup("tile", { lossRate })}
+        />
+      </>
+    );
+  };
+
+  const renderFurnitureForm = () => {
+    const value: FurnitureInputs = inputs.furniture;
+
+    return (
+      <>
+        {commonFields("furniture")}
+
+        <SelectField
+          label="가구 종류"
+          value={value.furnitureType}
+          options={furnitureTypes.map((item) => item.name)}
+          onChange={(furnitureType) =>
+            updateGroup("furniture", { furnitureType })
+          }
+        />
+        <NumberField
+          label="하부/본체 길이"
+          value={value.lowerLength}
+          suffix="m"
+          onChange={(lowerLength) =>
+            updateGroup("furniture", { lowerLength })
+          }
+        />
+        <NumberField
+          label="상부장 길이"
+          value={value.upperLength}
+          suffix="m"
+          onChange={(upperLength) =>
+            updateGroup("furniture", { upperLength })
+          }
+        />
+        <NumberField
+          label="도어 기준 폭"
+          value={value.doorWidth}
+          suffix="mm"
+          onChange={(doorWidth) =>
+            updateGroup("furniture", { doorWidth })
+          }
+        />
+        <NumberField
+          label="도어 높이"
+          value={value.doorHeight}
+          suffix="mm"
+          onChange={(doorHeight) =>
+            updateGroup("furniture", { doorHeight })
+          }
+        />
+        <NumberField
+          label="상판 깊이"
+          value={value.countertopWidth}
+          suffix="mm"
+          onChange={(countertopWidth) =>
+            updateGroup("furniture", { countertopWidth })
+          }
+        />
+
+        <div className="field">
+          <span className="field-label">상판 산출</span>
+          <div className="toggle-row">
+            <CheckToggle
+              label="상판 포함"
+              checked={value.includeCountertop}
+              onChange={(includeCountertop) =>
+                updateGroup("furniture", { includeCountertop })
+              }
+            />
+          </div>
+        </div>
+
+        <NumberField
+          label="여유율"
+          value={value.lossRate}
+          suffix="%"
+          onChange={(lossRate) => updateGroup("furniture", { lossRate })}
+        />
+      </>
+    );
+  };
+
+  const renderLightingForm = () => {
+    const value: LightingInputs = inputs.lighting;
+
+    return (
+      <>
+        {commonFields("lighting")}
+
+        <SelectField
+          label="공간 종류"
+          value={value.spaceType}
+          options={luxPresets.map((item) => item.name)}
+          onChange={(spaceType) => updateGroup("lighting", { spaceType })}
+        />
+
+        <ToggleGroup<AreaMode>
+          label="면적 입력 방식"
+          value={value.areaMode}
+          options={[
+            { label: "평수", value: "pyeong" },
+            { label: "가로 × 세로", value: "size" },
+          ]}
+          onChange={(areaMode) => updateGroup("lighting", { areaMode })}
+        />
+
+        {value.areaMode === "pyeong" ? (
+          <NumberField
+            label="시공 평수"
+            value={value.pyeong}
+            suffix="평"
+            onChange={(pyeong) => updateGroup("lighting", { pyeong })}
+          />
+        ) : (
+          <>
+            <NumberField
+              label="가로"
+              value={value.width}
+              suffix="m"
+              onChange={(width) => updateGroup("lighting", { width })}
+            />
+            <NumberField
+              label="세로"
+              value={value.height}
+              suffix="m"
+              onChange={(height) => updateGroup("lighting", { height })}
+            />
+          </>
+        )}
+
+        <NumberField
+          label="천장 높이"
+          value={value.ceilingHeight}
+          suffix="m"
+          onChange={(ceilingHeight) =>
+            updateGroup("lighting", { ceilingHeight })
+          }
+        />
+
+        <ToggleGroup<LightInstallType>
+          label="시공 방식"
+          value={value.installType}
+          options={[
+            { label: "다운라이트 중심", value: "downlight" },
+            { label: "메인등 병행", value: "main" },
+          ]}
+          onChange={(installType) =>
+            updateGroup("lighting", { installType })
+          }
+        />
+      </>
+    );
+  };
+
+  const renderForm = () => {
+    if (category === "wood") return renderWoodForm();
+    if (category === "electric") return renderElectricForm();
+    if (category === "aircon") return renderAirconForm();
+    if (category === "paint") return renderPaintForm();
+    if (category === "wallpaper") return renderWallpaperForm();
+    if (category === "floor") return renderFloorForm();
+    if (category === "tile") return renderTileForm();
+    if (category === "furniture") return renderFurnitureForm();
+    return renderLightingForm();
+  };
+
   return (
     <main className="page notranslate" translate="no">
       <div className="wrap">
         <section className="hero">
-          <div className="hero-badge">
-            <Calculator size={17} />
-            실무용 물량 계산기
-          </div>
+          <div className="hero-badge">INTERIOR CALCULATOR</div>
           <h1>현장 물량 계산 보드</h1>
-          <p className="sub">자재부터 설비 권장값까지 한 화면에서 계산합니다.</p>
+          <p className="sub">
+            자재부터 설비 권장값까지 한 화면에서 계산합니다. 입력값을 바꾸면 결과가 즉시 갱신됩니다.
+          </p>
         </section>
 
         <section className="tabs">
           {categories.map((item) => (
             <button
+              type="button"
               key={item.key}
               className={`tab ${category === item.key ? "active" : ""}`}
-              onClick={() => setCategory(item.key as CategoryKey)}
+              onClick={() => setCategory(item.key)}
             >
-              <span>{item.emoji}</span>
-              {item.label}
+              <span className="tab-emoji">{item.emoji}</span>
+              <span className="tab-label">{item.label}</span>
             </button>
           ))}
         </section>
@@ -531,169 +1152,58 @@ export default function App() {
           <div className="card">
             <div className="card-top">
               <div>
-                <h2>입력 정보</h2>
-                <p className="desc">{selectedCategory.label} 계산에 필요한 값을 입력하세요.</p>
+                <h2>입력</h2>
+                <p className="desc">{selectedCategory.label} 산출에 필요한 값을 입력하세요.</p>
               </div>
-              <button
-                className="btn gray"
-                onClick={() =>
-                  setInputs((prev) => ({
-                    ...prev,
-                    [category]: defaultInputs[category],
-                  }))
-                }
-              >
-                <RotateCcw size={17} />
+              <button type="button" className="btn gray" onClick={resetCurrent}>
                 초기화
               </button>
             </div>
 
-            <div className="form">
-              {category === "tile" && (
-                <>
-                  <NumberField label="시공 면적" value={inputs.tile.area} suffix="㎡" onChange={(v) => update("tile", "area", v)} />
-                  <NumberField label="타일 1장 가로" value={inputs.tile.tileWidth} suffix="mm" onChange={(v) => update("tile", "tileWidth", v)} />
-                  <NumberField label="타일 1장 세로" value={inputs.tile.tileHeight} suffix="mm" onChange={(v) => update("tile", "tileHeight", v)} />
-                  <NumberField label="박스당 장수" value={inputs.tile.piecesPerBox} suffix="장" onChange={(v) => update("tile", "piecesPerBox", v)} />
-                  <NumberField label="로스율" value={inputs.tile.lossRate} suffix="%" onChange={(v) => update("tile", "lossRate", v)} />
-                </>
-              )}
-
-              {category === "wallpaper" && (
-                <>
-                  <SelectField
-                    label="벽지 종류"
-                    value={inputs.wallpaper.wallpaperTypeIndex}
-                    options={wallpaperTypes.map((item) => item.name)}
-                    onChange={(v) => update("wallpaper", "wallpaperTypeIndex", v)}
-                  />
-                  <NumberField label="평수" value={inputs.wallpaper.pyeong} suffix="평" onChange={(v) => update("wallpaper", "pyeong", v)} />
-                  <NumberField label="천장 높이" value={inputs.wallpaper.height} suffix="m" onChange={(v) => update("wallpaper", "height", v)} />
-                  <ToggleField label="천장 도배" value={inputs.wallpaper.ceiling} onChange={(v) => update("wallpaper", "ceiling", v)} />
-                  <NumberField label="로스율" value={inputs.wallpaper.lossRate} suffix="%" onChange={(v) => update("wallpaper", "lossRate", v)} />
-                </>
-              )}
-
-              {category === "floor" && (
-                <>
-                  <SelectField
-                    label="마루 종류"
-                    value={inputs.floor.floorTypeIndex}
-                    options={floorTypes.map((item) => item.name)}
-                    onChange={(v) => update("floor", "floorTypeIndex", v)}
-                  />
-                  <NumberField label="시공 평수" value={inputs.floor.pyeong} suffix="평" onChange={(v) => update("floor", "pyeong", v)} />
-                  <NumberField label="로스율" value={inputs.floor.lossRate} suffix="%" onChange={(v) => update("floor", "lossRate", v)} />
-                </>
-              )}
-
-              {category === "paint" && (
-                <>
-                  <SelectField
-                    label="페인트 종류"
-                    value={inputs.paint.paintTypeIndex}
-                    options={paintTypes.map((item) => item.name)}
-                    onChange={(v) => update("paint", "paintTypeIndex", v)}
-                  />
-                  <NumberField label="평수" value={inputs.paint.pyeong} suffix="평" onChange={(v) => update("paint", "pyeong", v)} />
-                  <NumberField label="도장 횟수" value={inputs.paint.coats} suffix="회" onChange={(v) => update("paint", "coats", v)} />
-                  <NumberField label="로스율" value={inputs.paint.lossRate} suffix="%" onChange={(v) => update("paint", "lossRate", v)} />
-                </>
-              )}
-
-              {category === "wood" && (
-                <>
-                  <SelectField
-                    label="보드 종류"
-                    value={inputs.wood.boardTypeIndex}
-                    options={boardTypes.map((item) => item.name)}
-                    onChange={(v) => update("wood", "boardTypeIndex", v)}
-                  />
-                  <NumberField label="가로" value={inputs.wood.width} suffix="m" onChange={(v) => update("wood", "width", v)} />
-                  <NumberField label="세로" value={inputs.wood.height} suffix="m" onChange={(v) => update("wood", "height", v)} />
-                  <NumberField label="겹수" value={inputs.wood.layers} suffix="겹" onChange={(v) => update("wood", "layers", v)} />
-                  <NumberField label="로스율" value={inputs.wood.lossRate} suffix="%" onChange={(v) => update("wood", "lossRate", v)} />
-                </>
-              )}
-
-              {category === "furniture" && (
-                <>
-                  <SelectField
-                    label="가구 종류"
-                    value={inputs.furniture.furnitureTypeIndex}
-                    options={furnitureTypes.map((item) => item.name)}
-                    onChange={(v) => update("furniture", "furnitureTypeIndex", v)}
-                  />
-                  <NumberField label="하부장 길이" value={inputs.furniture.lower} suffix="m" onChange={(v) => update("furniture", "lower", v)} />
-                  <NumberField label="상부장 길이" value={inputs.furniture.upper} suffix="m" onChange={(v) => update("furniture", "upper", v)} />
-                  <NumberField label="여유율" value={inputs.furniture.lossRate} suffix="%" onChange={(v) => update("furniture", "lossRate", v)} />
-                  <NumberField label="도어 폭" value={inputs.furniture.doorWidth} suffix="m" onChange={(v) => update("furniture", "doorWidth", v)} />
-                </>
-              )}
-
-              {category === "lighting" && (
-                <>
-                  <SelectField
-                    label="공간 용도"
-                    value={inputs.lighting.luxPresetIndex}
-                    options={luxPresets.map((item) => item.name)}
-                    onChange={(v) => update("lighting", "luxPresetIndex", v)}
-                  />
-                  <NumberField label="평수" value={inputs.lighting.pyeong} suffix="평" onChange={(v) => update("lighting", "pyeong", v)} />
-                </>
-              )}
-
-              {category === "electric" && (
-                <>
-                  <NumberField label="구역 수" value={inputs.electric.zones} suffix="구역" onChange={(v) => update("electric", "zones", v)} />
-                  <NumberField label="구역당 조명" value={inputs.electric.lightPerZone} suffix="개" onChange={(v) => update("electric", "lightPerZone", v)} />
-                  <NumberField label="구역당 콘센트" value={inputs.electric.outletPerZone} suffix="개" onChange={(v) => update("electric", "outletPerZone", v)} />
-                  <NumberField label="구역당 스위치" value={inputs.electric.switchPerZone} suffix="개" onChange={(v) => update("electric", "switchPerZone", v)} />
-                  <NumberField label="예비 포인트" value={inputs.electric.reserve} suffix="개" onChange={(v) => update("electric", "reserve", v)} />
-                  <NumberField label="전용 회로" value={inputs.electric.dedicated} suffix="개" onChange={(v) => update("electric", "dedicated", v)} />
-                </>
-              )}
-
-              {category === "aircon" && (
-                <>
-                  <NumberField label="평수" value={inputs.aircon.pyeong} suffix="평" onChange={(v) => update("aircon", "pyeong", v)} />
-                  <NumberField label="층고" value={inputs.aircon.height} suffix="m" onChange={(v) => update("aircon", "height", v)} />
-                  <NumberField label="상향 보정률" value={inputs.aircon.correction} suffix="%" onChange={(v) => update("aircon", "correction", v)} />
-                </>
-              )}
-            </div>
+            <div className="form">{renderForm()}</div>
           </div>
 
-          <div className="card">
-            <div className="card-top">
-              <div>
-                <h2>계산 결과</h2>
-                <p className="desc">현재 선택: {selectedCategory.label}</p>
-              </div>
-              <button className="btn blue" onClick={copyResult}>
-                <Copy size={17} />
-                {copied ? "복사됨" : "결과 복사"}
-              </button>
-            </div>
-
-            <div className="main-result">
-              <div className="main-label">{result.mainLabel}</div>
-              <div className="main-value">{result.mainValue}</div>
-              <div className="helper">{result.helper}</div>
-            </div>
-
-            <div className="result-grid">
-              {result.items.map((item) => (
-                <div className="result-item" key={item.label}>
-                  <div className="result-name">{item.label}</div>
-                  <div className="result-value">{item.value}</div>
+          <div className="result-panel">
+            <div className="card">
+              <div className="card-top">
+                <div>
+                  <h2>결과</h2>
+                  <p className="desc">현재 선택: {selectedCategory.label}</p>
                 </div>
-              ))}
-            </div>
+                <button type="button" className="btn blue" onClick={copyResult}>
+                  {copied ? "복사됨" : "결과 복사"}
+                </button>
+              </div>
 
-            <div className="notice">
-              실제 현장 상황에 따라 로스율 및 시공 조건이 달라질 수 있습니다.
-              자재 규격, 절단 방향, 파손 가능성을 고려해 최종 발주량은 조정하세요.
+              <div className="main-result">
+                <div className="main-label">{result.mainLabel}</div>
+                <div className="main-value-row">
+                  <div className="main-value">{result.mainValue}</div>
+                  <div className="main-unit">{result.mainUnit}</div>
+                </div>
+                <div className="helper">{result.subText}</div>
+              </div>
+
+              <div className="result-grid">
+                {result.cards.map((card) => (
+                  <div className="result-item" key={card.label}>
+                    <div className="result-name">{card.label}</div>
+                    <div className="result-value">{card.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="notice">
+                <div className="notice-title">현장 메모</div>
+                <div className="notice-text">{result.note}</div>
+                <div className="chips">
+                  {result.chips.map((chip) => (
+                    <span className="chip" key={chip}>
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </section>
